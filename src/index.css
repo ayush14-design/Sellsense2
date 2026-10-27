@@ -8,8 +8,11 @@
   --color-card-white: #FFFFFF;
   --color-deep-slate: #0F172A;
   --color-slate-800: #1E293B;
+  --color-deep-charcoal: #1E293B;
   --color-muted-gray: #64748B;
   --color-border-light: #E2E8F0;
+  --color-border-beige: #E2E8F0;
+  --color-light-beige: #F8FAFC;
 
   /* Vibrant Accent Colors */
   --color-lime-accent: #84CC16;
@@ -57,8 +60,11 @@ body {
 .dark {
   --color-deep-slate: #F8F9FC;
   --color-slate-800: #E2E8F0;
+  --color-deep-charcoal: #F8F9FC;
   --color-muted-gray: #94A3B8;
   --color-border-light: #334155;
+  --color-border-beige: #334155;
+  --color-light-beige: #1E293B;
   --color-neutral-light: #0F172A;
   --color-card-white: #1E293B;
   --color-lime-light: #3F6212;
@@ -209,9 +215,17 @@ h1, h2, h3, h4, h5, h6 {
   background: #65A30D;
 }
 
-/* Gradient Text */
+/* Gradient Text - High Contrast for WCAG AA compliance */
 .gradient-text {
-  background: linear-gradient(135deg, #84CC16 0%, #06B6D4 100%);
+  background: linear-gradient(135deg, #15803D 0%, #0284C7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+}
+
+.dark .gradient-text {
+  background: linear-gradient(135deg, #A3E635 0%, #38BDF8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -569,7 +583,17 @@ tbody tr:hover {
 }
 
 .animated-gradient-text {
-  background: linear-gradient(-45deg, #84CC16, #06B6D4, #A855F7, #F97316);
+  background: linear-gradient(-45deg, #15803D, #0284C7, #7E22CE, #C2410C);
+  background-size: 400% 400%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 800;
+  animation: gradientShift 8s ease infinite;
+}
+
+.dark .animated-gradient-text {
+  background: linear-gradient(-45deg, #A3E635, #38BDF8, #C084FC, #FB923C);
   background-size: 400% 400%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

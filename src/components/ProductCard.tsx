@@ -2,14 +2,20 @@ import React from 'react';
 import type { Product } from '../types';
 import { Button } from './Button';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, TrendingDown, Activity, ExternalLink } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface ProductCardProps {
   product: Product;
+  onAnalyzeUploadedReviews?: (productName: string) => void;
+  hasUploadedData?: boolean;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({
+  product,
+  onAnalyzeUploadedReviews,
+  hasUploadedData,
+}) => {
   const navigate = useNavigate();
 
   const positivePercentage = Math.round((product.positiveCount / product.totalReviews) * 100);
@@ -38,7 +44,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         </div>
 
         {/* Sentiment Badge */}
-        <div className="absolute top-4 left-4">
+        <div className="absolute top-4 left-4 flex flex-col gap-1.5">
           {positivePercentage > negativePercentage ? (
             <div className="bg-green-500 text-white px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5 font-bold text-sm">
               <TrendingUp size={16} />
@@ -48,6 +54,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             <div className="bg-red-500 text-white px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5 font-bold text-sm">
               <TrendingDown size={16} />
               {negativePercentage}% Negative
+            </div>
+          )}
+
+          {hasUploadedData && (
+            <div className="bg-lime-500 text-slate-950 font-black px-2.5 py-0.5 rounded-lg text-xs shadow-md uppercase tracking-wider">
+              Uploaded Data
             </div>
           )}
         </div>
@@ -74,6 +86,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               {platform}
             </span>
           ))}
+          {hasUploadedData && (
+            <span className="px-3 py-1.5 bg-lime-100 text-lime-800 text-xs font-bold rounded-full border border-lime-300">
+              Excel / CSV Upload
+            </span>
+          )}
         </div>
 
         {/* Sentiment Distribution */}
@@ -124,22 +141,36 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-3">
-          <Button
-            variant="primary"
-            size="small"
-            className="flex-1 bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700 font-bold shadow-md hover:shadow-lg"
-            onClick={() => navigate(`/analysis/${product.id}`)}
-          >
-            View Insights
-          </Button>
-          <button
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all font-bold text-slate-700 border-2 border-slate-200 hover:border-slate-300"
-            onClick={() => navigate(`/google-reviews/${product.id}`)}
-            title="Google Reviews"
-          >
-            <ExternalLink size={18} />
-          </button>
+        <div className="flex flex-col gap-2">
+          {onAnalyzeUploadedReviews && (
+            <Button
+              variant="primary"
+              size="small"
+              className="w-full bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 font-black shadow-md hover:shadow-lg text-slate-950 flex items-center justify-center gap-1.5 cursor-pointer"
+              onClick={() => onAnalyzeUploadedReviews(product.name)}
+            >
+              Analyze Reviews
+            </Button>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="small"
+              className="flex-1 font-bold border-slate-300 hover:bg-slate-50 text-slate-700"
+              onClick={() => onAnalyzeUploadedReviews ? onAnalyzeUploadedReviews(product.name) : navigate(`/analysis/${product.id}`)}
+            >
+              View Insights
+            </Button>
+            <button
+              className="px-3 py-2 bg-amber-50 hover:bg-amber-100 rounded-xl transition-all font-bold text-amber-800 border border-amber-200 hover:border-amber-300 flex items-center gap-1.5 cursor-pointer shadow-xs"
+              onClick={() => navigate(`/google-reviews?product=${encodeURIComponent(product.name)}`)}
+              title={`View Google Maps Reviews for ${product.name}`}
+            >
+              <MapPin size={15} className="text-amber-600" />
+              <span className="text-xs font-bold hidden sm:inline">Maps</span>
+            </button>
+          </div>
         </div>
       </div>
 

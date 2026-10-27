@@ -13,20 +13,27 @@ class BackendApiService {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      ...options,
-      headers: {
-        ...this.getAuthHeaders(),
-        ...options.headers,
-      },
-    });
+    try {
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers: {
+          ...this.getAuthHeaders(),
+          ...options.headers,
+        },
+      });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Request failed' }));
-      throw new Error(error.message || `HTTP ${response.status}`);
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Request failed' }));
+        throw new Error(error.error || error.message || `HTTP ${response.status}`);
+      }
+
+      return response.json();
+    } catch (err: any) {
+      if (err.name === 'TypeError' && (err.message === 'Failed to fetch' || err.message?.includes('fetch'))) {
+        throw new Error(`Cannot connect to SellSense backend server at ${API_BASE}. Please ensure the server is running on port 3001.`);
+      }
+      throw err;
     }
-
-    return response.json();
   }
 
   // ============ AUTH ============
@@ -39,6 +46,18 @@ class BackendApiService {
 
   async signup(data: { email: string; password: string; fullName: string }): Promise<{ user: any; token: string }> {
     return this.request('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async googleAuth(data: { credential?: string; email?: string; fullName?: string }): Promise<{
+    user: any;
+    token: string;
+    hasRestaurant: boolean;
+    restaurant: any | null;
+  }> {
+    return this.request('/auth/google', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -84,7 +103,7 @@ class BackendApiService {
     });
   }
 
-  async handleZomatoCallback(code: string, state: string): Promise<{ success: boolean; redirectUrl: string }> {
+  async handleZomatoCallback(code: string, state: string): Promise<{ success: boolean; redirectUrl: string; expiresAt?: number }> {
     return this.request('/zomato/callback', {
       method: 'POST',
       body: JSON.stringify({ code, state }),
@@ -240,6 +259,327 @@ class BackendApiService {
 
   async cancelSubscription(): Promise<void> {
     return this.request('/subscription', { method: 'DELETE' });
+  }
+
+  // ============ PAYMENT & SUBSCRIPTION (Public) ============
+  async getPaymentPlans(): Promise<{ plans: any[] }> {
+    return this.request('/payment/plans');
+  }
+
+  async getMyRestaurants(): Promise<{ restaurants: any[] }> {
+    return this.request('/payment/my-restaurants');
+  }
+
+  async getPaymentSettings(): Promise<{ settings: any }> {
+    return this.request('/payment/settings/public');
+  }
+
+  async submitPayment(data: {
+    planId: string;
+    restaurantId: string;
+    amountInr: number;
+    transactionReference: string;
+    paymentDate: string;
+    screenshotPath?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; paymentId: string; message: string }> {
+    return this.request('/payment/submit', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getPaymentHistory(): Promise<{ payments: any[] }> {
+    return this.request('/payment/history');
+  }
+
+  async getPaymentDetails(id: string): Promise<{ payment: any }> {
+    return this.request(`/payment/${id}`);
+  }
+
+  async getSubscriptionStatus(): Promise<{ hasActiveSubscription: boolean; subscription: any; message?: string }> {
+    return this.request('/payment/subscription/status');
+  }
+
+  async getActiveAddons(): Promise<{ addons: any[] }> {
+    return this.request('/payment/addons/active');
+  }
+
+  // ============ ADMIN ============
+  async getAdminOverview(): Promise<any> {
+    return this.request('/admin/overview');
+  }
+
+  async getAdminUsers(params: { page: number; limit: number; search: string; role: string; status: string }): Promise<any> {
+    return this.request(`/admin/users?page=${params.page}&limit=${params.limit}&search=${params.search}&role=${params.role}&status=${params.status}`);
+  }
+
+  async getAdminPayments(params: { page: number; limit: number; status: string; search: string }): Promise<any> {
+    return this.request(`/admin/payments?page=${params.page}&limit=${params.limit}&status=${params.status}&search=${params.search}`);
+  }
+
+  async getAdminSubscriptions(params: { page: number; limit: number; status: string; search: string }): Promise<any> {
+    return this.request(`/admin/subscriptions?page=${params.page}&limit=${params.limit}&status=${params.status}&search=${params.search}`);
+  }
+
+  async getAdminPlans(): Promise<any> {
+    return this.request('/admin/plans');
+  }
+
+  async getAdminAddons(): Promise<any> {
+    return this.request('/admin/addons');
+  }
+
+  async getAdminFeatures(): Promise<any> {
+    return this.request('/admin/features');
+  }
+
+  async getAdminRestaurants(params: { page: number; limit: number; search: string; status: string }): Promise<any> {
+    return this.request(`/admin/restaurants?page=${params.page}&limit=${params.limit}&search=${params.search}&status=${params.status}`);
+  }
+
+  async getAdminActivity(params: { page: number; limit: number }): Promise<any> {
+    return this.request(`/admin/activity?page=${params.page}&limit=${params.limit}`);
+  }
+
+  async getAdminNotifications(params: { page: number; limit: number }): Promise<any> {
+    return this.request(`/admin/notifications?page=${params.page}&limit=${params.limit}`);
+  }
+
+  async getAdminSettings(): Promise<any> {
+    return this.request('/admin/settings');
+  }
+
+  async adminAction(endpoint: string, data: any): Promise<any> {
+    return this.request(`/admin/${endpoint}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Admin PATCH/DELETE methods
+  async adminPatch(endpoint: string, data: any): Promise<any> {
+    return this.request(`/admin/${endpoint}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async adminDelete(endpoint: string): Promise<any> {
+    return this.request(`/admin/${endpoint}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ============ GOOGLE REVIEWS INTEGRATION ============
+  async getGoogleStatus(restaurantId = 'rest_demo_001'): Promise<{
+    isConfigured: boolean;
+    missingKeys: string[];
+    connection: any | null;
+  }> {
+    return this.request(`/google/status?restaurantId=${restaurantId}`);
+  }
+
+  async getGoogleAuthUrl(restaurantId = 'rest_demo_001'): Promise<{
+    authUrl: string;
+    isConfigured: boolean;
+    missingKeys: string[];
+    message?: string;
+  }> {
+    return this.request(`/google/auth-url?restaurantId=${restaurantId}`);
+  }
+
+  async handleGoogleCallback(code: string, state: string): Promise<any> {
+    return this.request('/google/callback', {
+      method: 'POST',
+      body: JSON.stringify({ code, state }),
+    });
+  }
+
+  async getGoogleLocations(restaurantId = 'rest_demo_001'): Promise<{ locations: any[] }> {
+    return this.request(`/google/locations?restaurantId=${restaurantId}`);
+  }
+
+  async selectGoogleLocation(data: {
+    restaurantId: string;
+    locationId: string;
+    locationName: string;
+    locationAddress?: string;
+  }): Promise<any> {
+    return this.request('/google/select-location', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async syncGoogleReviews(restaurantId = 'rest_demo_001'): Promise<any> {
+    return this.request('/google/sync', {
+      method: 'POST',
+      body: JSON.stringify({ restaurantId }),
+    });
+  }
+
+  async connectGoogleDirect(restaurantId = 'rest_demo_001', locationName?: string, locationAddress?: string): Promise<any> {
+    return this.request('/google/connect-direct', {
+      method: 'POST',
+      body: JSON.stringify({ restaurantId, locationName, locationAddress }),
+    });
+  }
+
+  async disconnectGoogle(restaurantId = 'rest_demo_001'): Promise<any> {
+    return this.request('/google/disconnect', {
+      method: 'POST',
+      body: JSON.stringify({ restaurantId }),
+    });
+  }
+
+  async getGoogleAnalysis(restaurantId = 'rest_demo_001'): Promise<any> {
+    return this.request(`/google/analysis?restaurantId=${restaurantId}`);
+  }
+
+  // ============ MANUAL SPREADSHEET REVIEWS ============
+  async importManualReviews(data: {
+    restaurantId: string;
+    filename: string;
+    fileType: string;
+    reviews: Array<{
+      productName: string;
+      customerReview: string;
+      rating?: number | null;
+      reviewDate?: string;
+      platform?: string;
+      isGeneral?: boolean;
+    }>;
+  }): Promise<{
+    success: boolean;
+    batchId: string;
+    filename: string;
+    totalRows: number;
+    importedCount: number;
+    skippedCount: number;
+    productsWithReviews: string[];
+    errors: string[];
+  }> {
+    return this.request('/reviews/manual-import', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getManualReviews(params: {
+    restaurantId?: string;
+    productName?: string;
+    platform?: string;
+    batchId?: string;
+    page?: number;
+    limit?: number;
+  } = {}): Promise<{
+    reviews: any[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+    stats: {
+      totalImportedReviews: number;
+      productsCount: number;
+      productNames: string[];
+      latestImportDate: string | null;
+      platformDistribution: Array<{ platform: string; count: number }>;
+    };
+  }> {
+    const query = new URLSearchParams();
+    if (params.restaurantId) query.set('restaurantId', params.restaurantId);
+    if (params.productName) query.set('productName', params.productName);
+    if (params.platform) query.set('platform', params.platform);
+    if (params.batchId) query.set('batchId', params.batchId);
+    if (params.page) query.set('page', params.page.toString());
+    if (params.limit) query.set('limit', params.limit.toString());
+    return this.request(`/reviews/manual?${query.toString()}`);
+  }
+
+  async getManualBatches(restaurantId = 'rest_demo_001'): Promise<{ batches: any[] }> {
+    return this.request(`/reviews/batches?restaurantId=${restaurantId}`);
+  }
+
+  async deleteManualBatch(batchId: string, restaurantId = 'rest_demo_001'): Promise<any> {
+    return this.request(`/reviews/batch/${batchId}?restaurantId=${restaurantId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getProductReviewAnalysis(productName: string, restaurantId = 'rest_demo_001'): Promise<{
+    productName: string;
+    totalReviews: number;
+    positiveCount: number;
+    negativeCount: number;
+    neutralCount: number;
+    positivePercentage: number;
+    negativePercentage: number;
+    neutralPercentage: number;
+    averageRating: number | null;
+    ratingDistribution?: Record<string, { count: number; percentage: number }>;
+    positiveThemes: Array<{ theme: string; count: number; percentage: number; representativeQuote: string }>;
+    negativeThemes: Array<{ theme: string; count: number; percentage: number; representativeQuote: string }>;
+    pairedTypeAnalysis?: Array<{
+      id: string;
+      category: string;
+      icon: string;
+      positiveCount: number;
+      negativeCount: number;
+      sentimentScore: number;
+      goodPoints: Array<{ point: string; count: number; quote: string }>;
+      badPoints: Array<{ point: string; count: number; quote: string }>;
+    }>;
+    qualityAnalysis?: {
+      authenticityScore: number;
+      totalFlagged: number;
+      duplicateCount: number;
+      nonsenseCount: number;
+      contradictionCount: number;
+      spamCount: number;
+      flaggedReviews: Array<{
+        id: string;
+        customerReview: string;
+        rating: number | null;
+        reviewDate: string;
+        platform: string;
+        issueType: 'duplicate' | 'gibberish' | 'mismatch' | 'spam';
+        reason: string;
+        severity: 'high' | 'medium' | 'low';
+        explanation: string;
+      }>;
+    };
+    customerPreferences: string[];
+    improvementOpportunities: string[];
+    aiSummary: string;
+    sampleReviews: any[];
+  }> {
+    const query = new URLSearchParams({
+      productName,
+      restaurantId,
+    });
+    return this.request(`/reviews/product-analysis?${query.toString()}`);
+  }
+
+  async getProductsSummary(restaurantId = 'rest_demo_001'): Promise<{
+    products: Array<{
+      id: string;
+      name: string;
+      category: string;
+      totalReviews: number;
+      positiveCount: number;
+      negativeCount: number;
+      neutralCount: number;
+      positivePercentage: number;
+      negativePercentage: number;
+      neutralPercentage: number;
+      averageRating: number | null;
+      lastAnalyzed: string;
+      latestReviewDate: string | null;
+      platforms: string[];
+      imageUrl: string;
+      dataMode: string;
+    }>;
+    total: number;
+  }> {
+    return this.request(`/reviews/products-summary?restaurantId=${encodeURIComponent(restaurantId)}`);
   }
 }
 

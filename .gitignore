@@ -1,3 +1,43 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Production build outputs
+dist
+dist-ssr
+build
+server/dist
+server/build
+
+# Local environment and secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+server/.env
+server/.env.local
+!.env.example
+!server/.env.example
+
+# Database files
+data/
+server/data/*.db
+server/data/*.db-journal
+server/data/*.db-wal
+server/data/*.db-shm
+*.sqlite
+*.db
+
+# Temporary images in root
+WhatsApp*.jpeg
+WhatsApp*.jpg
+
+# Uploads
+uploads
+server/uploads
+
 # Logs
 logs
 *.log
@@ -7,19 +47,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-.env
-.env.*
-!.env.example
-
-# Editor directories and files
+# Editor directories and OS files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj

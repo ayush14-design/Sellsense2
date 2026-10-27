@@ -98,18 +98,24 @@ interface ZomatoErrorResponse {
 }
 
 export class ZomatoService {
-  private config: ZomatoConfig;
+  private config: ZomatoConfig | null = null;
   private pkceStore: Map<string, { codeVerifier: string; state: string }> = new Map();
 
-  constructor() {
-    this.config = {
-      clientId: process.env.ZOMATO_CLIENT_ID || '',
-      clientSecret: process.env.ZOMATO_CLIENT_SECRET || '',
-      redirectUri: process.env.ZOMATO_REDIRECT_URI || '',
-      apiKey: process.env.ZOMATO_API_KEY || '',
-    };
+  private getConfig(): ZomatoConfig {
+    if (!this.config) {
+      this.config = {
+        clientId: process.env.ZOMATO_CLIENT_ID || '',
+        clientSecret: process.env.ZOMATO_CLIENT_SECRET || '',
+        redirectUri: process.env.ZOMATO_REDIRECT_URI || '',
+        apiKey: process.env.ZOMATO_API_KEY || '',
+      };
+    }
+    return this.config;
+  }
 
-    if (!this.config.clientId || !this.config.clientSecret || !this.config.redirectUri || !this.config.apiKey) {
+  private validateConfig(): void {
+    const config = this.getConfig();
+    if (!config.clientId || !config.clientSecret || !config.redirectUri || !config.apiKey) {
       throw new Error('Missing Zomato configuration. Check environment variables.');
     }
   }
@@ -123,15 +129,17 @@ export class ZomatoService {
 
   // Generate OAuth authorization URL with PKCE
   generateAuthUrl(userId: string): { authUrl: string; state: string } {
+    this.validateConfig();
     const state = crypto.randomBytes(16).toString('hex');
     const { codeVerifier, codeChallenge } = this.generatePKCE();
 
     // Store PKCE verifier with state for later validation
     this.pkceStore.set(state, { codeVerifier, state });
 
+    const config = this.getConfig();
     const params = new URLSearchParams({
-      client_id: this.config.clientId,
-      redirect_uri: this.config.redirectUri,
+      client_id: config.clientId,
+      redirect_uri: config.redirectUri,
       response_type: 'code',
       scope: 'restaurants.read reviews.read',
       state,
@@ -147,17 +155,19 @@ export class ZomatoService {
 
   // Exchange authorization code for tokens
   async exchangeCodeForTokens(code: string, state: string): Promise<ZomatoTokens> {
+    this.validateConfig();
     const pkceData = this.pkceStore.get(state);
     if (!pkceData) {
       throw new Error('Invalid or expired state parameter');
     }
 
+    const config = this.getConfig();
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
-      client_id: this.config.clientId,
-      client_secret: this.config.clientSecret,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
       code,
-      redirect_uri: this.config.redirectUri,
+      redirect_uri: config.redirectUri,
       code_verifier: pkceData.codeVerifier,
     });
 
@@ -185,10 +195,12 @@ export class ZomatoService {
 
   // Refresh access token
   async refreshAccessToken(refreshToken: string): Promise<ZomatoTokens> {
+    this.validateConfig();
+    const config = this.getConfig();
     const params = new URLSearchParams({
       grant_type: 'refresh_token',
-      client_id: this.config.clientId,
-      client_secret: this.config.clientSecret,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
       refresh_token: refreshToken,
     });
 
@@ -213,13 +225,15 @@ export class ZomatoService {
 
   // Make authenticated API request to Zomato
   private async apiRequest<T>(endpoint: string, params: Record<string, string>, accessToken: string): Promise<T> {
+    this.validateConfig();
+    const config = this.getConfig();
     const url = new URL(`${ZOMATO_API_BASE}${endpoint}`);
     Object.entries(params).forEach(([key, value]) => url.searchParams.append(key, value));
 
     const response = await fetch(url.toString(), {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
-        'user-key': this.config.apiKey,
+        'user-key': config.apiKey,
         'Accept': 'application/json',
       },
     });

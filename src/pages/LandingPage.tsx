@@ -14,6 +14,7 @@ import {
   Check, Copy
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { authStorage } from '../utils/auth';
 import { useCounterAnimation } from '../hooks/useScrollAnimation';
 import { useScrollProgress, useParallax } from '../hooks/useScrollProgress';
 import { useScrollReveal, useStaggeredReveal } from '../hooks/useScrollReveal';
@@ -21,6 +22,21 @@ import { useScrollTrigger } from '../hooks/useScrollProgress';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
+
+  const handleGetStarted = () => {
+    const isAuthenticated = authStorage.isAuthenticated();
+    if (!isAuthenticated) {
+      navigate('/signup');
+    } else {
+      const user = authStorage.getUser();
+      if (user?.role === 'super_admin' || user?.role === 'admin' || user?.email === 'admin@sellsense.ai') {
+        navigate('/admin');
+      } else {
+        navigate('/setup');
+      }
+    }
+  };
+
   const { progress } = useScrollProgress();
   const [activeStep, setActiveStep] = useState(0);
   const [roiOrders, setRoiOrders] = useState(1200);
@@ -218,7 +234,7 @@ export const LandingPage: React.FC = () => {
                       <Utensils className="text-green text-2xl" />
                     </div>
                   </div>
-                  <div className="mt-4 h-12 bg-lime-accent rounded-xl flex items-center justify-center text-white font-semibold group-hover:shadow-lg transition-shadow">
+                  <div className="mt-4 h-12 bg-lime-400 rounded-xl flex items-center justify-center text-slate-950 font-black group-hover:shadow-lg transition-shadow">
                     Continue
                   </div>
                 </div>
@@ -470,8 +486,8 @@ export const LandingPage: React.FC = () => {
               </div>
 
               <div className="flex flex-wrap gap-4 mt-8 reveal-on-scroll right visible is-visible" style={{ transitionDelay: '300ms' }}>
-                <Button size="large" onClick={() => navigate('/zomato-connect')} className="group bg-lime-accent text-white hover:bg-lime-hover shadow-lg hover:shadow-xl transition-all duration-300">
-                  Connect Zomato
+                <Button size="large" onClick={handleGetStarted} className="group bg-lime-400 text-slate-950 font-black hover:bg-lime-500 shadow-lg hover:shadow-xl transition-all duration-300">
+                  Get Started Free
                   <ArrowRight className="inline ml-2 transition-transform group-hover:translate-x-1" size={20} />
                 </Button>
                 <Button
@@ -1426,7 +1442,7 @@ export const LandingPage: React.FC = () => {
                   <button
                     key={i}
                     className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 tab-button ${
-                      i === 0 ? 'bg-lime-accent text-white shadow-lg' : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700'
+                      i === 0 ? 'bg-lime-400 text-slate-950 font-black shadow-lg' : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700'
                     }`}
                   >
                     {filter}
@@ -1647,7 +1663,7 @@ export const LandingPage: React.FC = () => {
                         onClick={() => setRoiOrders(preset)}
                         className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
                           roiOrders === preset
-                            ? 'bg-lime-accent text-white border-lime-accent'
+                            ? 'bg-lime-400 text-slate-950 font-black border-lime-400'
                             : 'bg-gray-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-gray-200 dark:border-slate-600 hover:border-lime-accent'
                         }`}
                       >
@@ -1756,10 +1772,10 @@ export const LandingPage: React.FC = () => {
 
                   <Button
                     size="large"
-                    onClick={() => navigate('/zomato-connect')}
-                    className="w-full bg-lime-accent text-white hover:bg-lime-hover shadow-lg font-bold text-base py-4"
+                    onClick={handleGetStarted}
+                    className="w-full bg-lime-400 text-slate-950 hover:bg-lime-500 shadow-lg font-black text-base py-4"
                   >
-                    Start Recovering Lost Revenue
+                    Get Started Free
                     <ArrowRight className="inline ml-2" size={18} />
                   </Button>
                 </div>
@@ -1878,8 +1894,8 @@ export const LandingPage: React.FC = () => {
                   <p className="text-gray-600">Single view with cross-platform insights & recommendations</p>
                 </div>
               </div>
-              <Button size="large" onClick={() => navigate('/zomato-connect')} className="bg-lime-accent text-white hover:bg-lime-hover shadow-lg">
-                Connect Your Platforms
+              <Button size="large" onClick={handleGetStarted} className="bg-lime-400 text-slate-950 font-black hover:bg-lime-500 shadow-lg">
+                Get Started Free
                 <ArrowRight className="inline ml-2" size={20} />
               </Button>
             </div>
@@ -2692,8 +2708,8 @@ export const LandingPage: React.FC = () => {
           <div className="mt-8 text-center reveal-on-scroll">
             <p className="text-slate-600 dark:text-slate-400 mb-4">This is a live preview with sample data. Connect your accounts to see your real insights.</p>
             <div className="flex flex-wrap gap-4 justify-center">
-              <Button size="large" onClick={() => navigate('/zomato-connect')} className="bg-lime-accent text-white hover:bg-lime-hover shadow-lg hover:shadow-xl">
-                Connect Zomato Now
+              <Button size="large" onClick={handleGetStarted} className="bg-lime-400 text-slate-950 font-black hover:bg-lime-500 shadow-lg hover:shadow-xl">
+                Get Started Free
                 <ArrowRight className="inline ml-2" size={20} />
               </Button>
               <Button variant="outline" size="large" onClick={() => scrollToSection('how-it-works')} className="border-gray-300 dark:border-slate-600 hover:border-lime-accent hover:text-lime-accent text-slate-700 dark:text-slate-300">
@@ -2797,10 +2813,10 @@ export const LandingPage: React.FC = () => {
           <div className="flex flex-wrap gap-4 justify-center reveal-on-scroll">
             <Button
               size="large"
-              onClick={() => navigate('/zomato-connect')}
-              className="bg-lime-accent text-white hover:bg-lime-hover shadow-lg hover:shadow-xl"
+              onClick={handleGetStarted}
+              className="bg-lime-400 text-slate-950 font-black hover:bg-lime-500 shadow-lg hover:shadow-xl"
             >
-              Connect Zomato Now
+              Get Started Free
               <ArrowRight className="inline ml-2" size={20} />
             </Button>
             <Button
@@ -2922,7 +2938,7 @@ export const LandingPage: React.FC = () => {
                     className="flex-1 px-6 py-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-500 focus:outline-none focus:border-lime-accent focus:bg-white/20 transition-all"
                     required
                   />
-                  <Button type="submit" size="large" className="bg-lime-accent text-white hover:bg-lime-hover shadow-lg hover:shadow-xl flex items-center gap-2 whitespace-nowrap">
+                  <Button type="submit" size="large" className="bg-lime-400 text-slate-950 font-black hover:bg-lime-500 shadow-lg hover:shadow-xl flex items-center gap-2 whitespace-nowrap">
                     Subscribe
                     <ArrowRight className="size-4" />
                   </Button>
@@ -2958,7 +2974,7 @@ export const LandingPage: React.FC = () => {
       {/* Scroll to Top Button */}
       <button
         ref={scrollTopRef}
-        className={`fixed bottom-8 right-8 w-12 h-12 bg-lime-accent text-white rounded-xl shadow-lg hover:shadow-xl hover:bg-lime-hover transition-all duration-300 flex items-center justify-center z-50 ${
+        className={`fixed bottom-8 right-8 w-12 h-12 bg-lime-400 text-slate-950 rounded-xl shadow-lg hover:shadow-xl hover:bg-lime-500 transition-all duration-300 flex items-center justify-center z-50 ${
           scrollTopVisible ? 'opacity-100 pointer-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-4'
         }`}
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}

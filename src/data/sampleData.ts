@@ -13,6 +13,8 @@ export const demoRestaurant: Restaurant = {
   reviewSources: ['Zomato', 'Swiggy', 'Google'],
   dataMode: 'DEMO',
   createdAt: '2026-09-01T00:00:00Z',
+  ownerId: 'user_demo_001',
+  isActive: true,
 };
 
 // Platform Connections

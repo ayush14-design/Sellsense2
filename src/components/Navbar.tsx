@@ -1,25 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authStorage } from '../utils/auth';
-import { Menu, X, Brain, ArrowRight, Sun, Moon, Utensils } from 'lucide-react';
+import { Menu, X, Brain, ArrowRight, Sun, Moon } from 'lucide-react';
+import { isDarkMode, setTheme, subscribeThemeChange } from '../utils/theme';
 
 export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const isAuthenticated = authStorage.isAuthenticated();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [dark, setDark] = useState<boolean>(() => isDarkMode());
 
   const handleGetStarted = () => {
-    if (isAuthenticated) {
-      const restaurant = authStorage.getRestaurant();
-      if (restaurant) {
-        navigate('/products');
+    if (!isAuthenticated) {
+      navigate('/signup');
+    } else {
+      const user = authStorage.getUser();
+      if (user?.role === 'super_admin' || user?.email === 'admin@sellsense.ai') {
+        navigate('/admin');
       } else {
+        // Direct to restaurant setup onboarding rather than skipping straight to products
         navigate('/setup');
       }
-    } else {
-      navigate('/signup');
     }
   };
 
@@ -39,23 +41,12 @@ export const Navbar: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Listen to unified theme changes across the app
   useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  // Initialize theme from localStorage
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark');
-    }
+    const unsubscribe = subscribeThemeChange((isDark) => {
+      setDark(isDark);
+    });
+    return unsubscribe;
   }, []);
 
   return (
@@ -66,11 +57,13 @@ export const Navbar: React.FC = () => {
     }`}>
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-slate-100 hover:opacity-80 transition-opacity group">
+          <Link to="/" className="flex items-center gap-2 text-2xl font-bold hover:opacity-80 transition-opacity group">
             <div className="w-8 h-8 bg-gradient-to-br from-lime-500 to-cyan-500 rounded-xl flex items-center justify-center group-hover:rotate-3 transition-transform duration-300">
               <Brain className="text-white text-lg" />
             </div>
-            SellSense
+            <span style={{ background: 'linear-gradient(135deg, #84cc16, #06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+              SellSense
+            </span>
           </Link>
 
           <div className="hidden md:flex items-center gap-10">
@@ -127,26 +120,18 @@ export const Navbar: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-4">
-              {!isAuthenticated && (
-                <Link
-                  to="/zomato-connect"
-                  className="flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 group"
-                >
-                  <Utensils className="size-4" />
-                  Connect Zomato
-                  <ArrowRight className="inline transition-transform group-hover:translate-x-1" size={14} />
-                </Link>
-              )}
+
+
               {/* Theme Toggle */}
               <button
-                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                className="p-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors group"
+                onClick={() => setTheme(!dark)}
+                className="p-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors group cursor-pointer"
                 aria-label="Toggle theme"
               >
-                {theme === 'light' ? (
-                  <Moon className="size-5 group-hover:rotate-90 transition-transform duration-300" />
+                {!dark ? (
+                  <Moon className="size-5 group-hover:rotate-90 transition-transform duration-300 text-slate-700" />
                 ) : (
-                  <Sun className="size-5 group-hover:-rotate-90 transition-transform duration-300" />
+                  <Sun className="size-5 group-hover:-rotate-90 transition-transform duration-300 text-amber-400" />
                 )}
               </button>
 
@@ -230,12 +215,7 @@ export const Navbar: React.FC = () => {
               >
                 FAQ
               </button>
-              {!isAuthenticated && (
-                <Link to="/zomato-connect" className="text-left px-4 py-3 text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-all font-medium flex items-center gap-2">
-                  <Utensils className="size-4" />
-                  Connect Zomato
-                </Link>
-              )}
+
               {!isAuthenticated && (
                 <Link to="/login" className="text-left px-4 py-3 text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-all font-medium">
                   Sign In

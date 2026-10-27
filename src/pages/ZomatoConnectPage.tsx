@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { authStorage } from '../utils/auth';
-import { Loader2, CheckCircle, XCircle, ExternalLink, ArrowLeft, ChevronRight, AlertCircle, Info, Search, MapPin, X } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, ExternalLink, ArrowLeft, ChevronRight, AlertCircle, Info, Search } from 'lucide-react';
 import { zomatoApi, convertZomatoToRestaurant } from '../services/zomatoApi';
 import { backendApi } from '../services/backendApi';
 import type { Restaurant, BusinessType } from '../types';
@@ -28,11 +28,16 @@ export const ZomatoConnectPage: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Check API mode on mount
+  // Check API mode on mount and redirect admins directly to /admin
   useEffect(() => {
+    const user = authStorage.getUser();
+    if (user?.role === 'super_admin' || user?.role === 'admin' || user?.email === 'admin@sellsense.ai') {
+      navigate('/admin', { replace: true });
+      return;
+    }
     const config = zomatoApi.getConnectionInfo();
     setApiMode(config.demoMode ? 'demo' : 'real');
-  }, []);
+  }, [navigate]);
 
   // Handle OAuth callback from Zomato (production mode)
   useEffect(() => {
@@ -180,8 +185,11 @@ export const ZomatoConnectPage: React.FC = () => {
 
     setLoading(true);
     try {
+      const user = authStorage.getUser();
+      const ownerId = user?.id || 'unknown';
+
       // Convert Zomato restaurant to our format
-      const restaurant = convertZomatoToRestaurant(selectedRestaurant);
+      const restaurant = convertZomatoToRestaurant(selectedRestaurant, ownerId);
 
       // Update with user-provided details
       const finalRestaurant: Restaurant = {
@@ -242,7 +250,7 @@ export const ZomatoConnectPage: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 bg-lime-500/10 text-lime-600 px-4 py-2 rounded-full mb-4">
-            <div className="w-8 h-8 bg-lime-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+            <div className="w-8 h-8 bg-lime-400 rounded-full flex items-center justify-center text-slate-950 text-sm font-black">
               Z
             </div>
             <span className="font-semibold">Zomato Integration</span>
@@ -270,7 +278,7 @@ export const ZomatoConnectPage: React.FC = () => {
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
                   ['connect', 'select', 'configure', 'complete'].indexOf(step) >= i
-                    ? 'bg-lime-500 text-white'
+                    ? 'bg-lime-400 text-slate-950 font-black'
                     : 'bg-light-beige text-muted-gray'
                 }`}
               >
@@ -519,7 +527,7 @@ export const ZomatoConnectPage: React.FC = () => {
                         </div>
                       </div>
                       {selectedRestaurant?.id === restaurant.id && (
-                        <div className="absolute top-4 right-4 w-6 h-6 bg-lime-500 text-white rounded-full flex items-center justify-center">
+                        <div className="absolute top-4 right-4 w-6 h-6 bg-lime-400 text-slate-950 rounded-full flex items-center justify-center font-bold">
                           <CheckCircle size={16} />
                         </div>
                       )}

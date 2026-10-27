@@ -107,7 +107,7 @@ class ZomatoApiService {
     const tokens: ZomatoTokens = {
       accessToken: result.success ? 'backend_token' : '',
       refreshToken: '',
-      expiresAt: result.expiresAt || Date.now() + 3600 * 1000,
+      expiresAt: (result as any)?.expiresAt || Date.now() + 3600 * 1000,
       scope: 'restaurants.read reviews.read',
     };
     this.saveTokens(tokens);
@@ -398,7 +398,7 @@ if (typeof window !== 'undefined') {
 // Helper to convert Zomato restaurant to our Restaurant type
 import type { Restaurant, BusinessType } from '../types';
 
-export function convertZomatoToRestaurant(zomatoRes: ZomatoRestaurant): Restaurant {
+export function convertZomatoToRestaurant(zomatoRes: ZomatoRestaurant, ownerId: string): Restaurant {
   return {
     id: `zomato_${zomatoRes.id}`,
     name: zomatoRes.name,
@@ -410,6 +410,8 @@ export function convertZomatoToRestaurant(zomatoRes: ZomatoRestaurant): Restaura
     description: `${zomatoRes.cuisines} • ₹${zomatoRes.average_cost_for_two} for two`,
     reviewSources: ['Zomato'],
     dataMode: 'LIVE',
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    ownerId,
+    isActive: true,
   };
 }
