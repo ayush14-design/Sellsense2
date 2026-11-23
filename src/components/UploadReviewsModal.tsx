@@ -2,10 +2,11 @@ import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import {
   Upload, FileSpreadsheet, Download, X, CheckCircle, AlertTriangle,
-  Trash2, RefreshCw, Sparkles, Check, HelpCircle, ArrowRight
+  RefreshCw, Sparkles, Check, HelpCircle, ArrowRight, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Button } from './Button';
 import { backendApi } from '../services/backendApi';
+import { authStorage } from '../utils/auth';
 
 interface UploadReviewsModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAdvancedMapping, setShowAdvancedMapping] = useState(false);
 
   // Column mapping states
   const [availableHeaders, setAvailableHeaders] = useState<string[]>([]);
@@ -58,7 +60,6 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
 
   const [rawRows, setRawRows] = useState<any[]>([]);
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
-  const [filterView, setFilterView] = useState<'all' | 'valid' | 'invalid'>('all');
   const [importResult, setImportResult] = useState<{
     importedCount: number;
     skippedCount: number;
@@ -70,56 +71,56 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Download sample template (.xlsx or .csv)
+  // Resolve active restaurant strictly
+  const currentUser = authStorage.getUser();
+  const currentRestaurant = authStorage.getRestaurant();
+  const resolvedRestaurantId = restaurantId || currentRestaurant?.id || (currentUser ? `rest_${currentUser.id}` : 'my_restaurant');
+  const resolvedRestaurantName = restaurantName || currentRestaurant?.name || (currentUser?.fullName ? `${currentUser.fullName}'s Restaurant` : 'My Restaurant');
+
+  // Download standard sample template (.xlsx or .csv)
   const handleDownloadTemplate = (format: 'xlsx' | 'csv' = 'xlsx') => {
     const templateData = [
       {
-        'Restaurant Name': restaurantName || 'Neelam Restaurants',
-        'Product Name': 'Paneer Tikka',
-        'Customer Review': 'Very tasty and well cooked. Soft cottage cheese with great smoky flavor.',
+        'Product Name': 'Paneer Butter Masala',
+        'Customer Review': 'Super rich gravy and very soft paneer cubes. Packaging was intact and warm.',
         'Rating': 5,
-        'Review Date': '2026-10-10',
+        'Review Date': '2026-11-01',
         'Platform': 'Zomato',
       },
       {
-        'Restaurant Name': restaurantName || 'Neelam Restaurants',
+        'Product Name': 'Paneer Butter Masala',
+        'Customer Review': 'A bit oily on top, but delicious flavor with garlic naan.',
+        'Rating': 4,
+        'Review Date': '2026-11-02',
+        'Platform': 'Swiggy',
+      },
+      {
         'Product Name': 'Veg Biryani',
-        'Customer Review': 'Good taste and aroma, but the portion size is slightly low for the price.',
-        'Rating': 3,
-        'Review Date': '2026-10-11',
-        'Platform': 'Swiggy',
-      },
-      {
-        'Restaurant Name': restaurantName || 'Neelam Restaurants',
-        'Product Name': 'Masala Dosa',
-        'Customer Review': 'Crispy crust and delicious potato filling. Coconut chutney was fresh.',
+        'Customer Review': 'Fragrant basmati rice, generous vegetables and spicy salan. Loved it!',
         'Rating': 5,
-        'Review Date': '2026-10-12',
+        'Review Date': '2026-11-03',
         'Platform': 'Google',
       },
       {
-        'Restaurant Name': restaurantName || 'Neelam Restaurants',
-        'Product Name': 'Butter Naan',
-        'Customer Review': 'Super soft and buttery, stayed fresh and warm during delivery.',
+        'Product Name': 'Veg Biryani',
+        'Customer Review': 'Quantity was smaller than expected for the price. Food arrived lukewarm.',
+        'Rating': 2,
+        'Review Date': '2026-11-04',
+        'Platform': 'Swiggy',
+      },
+      {
+        'Product Name': 'Crispy Corn',
+        'Customer Review': 'Perfect crunch and chatpata seasoning. Our family favourite starter.',
         'Rating': 5,
-        'Review Date': '2026-10-13',
+        'Review Date': '2026-11-05',
         'Platform': 'Zomato',
       },
       {
-        'Restaurant Name': restaurantName || 'Neelam Restaurants',
-        'Product Name': 'Dal Makhani',
-        'Customer Review': 'Gravy had leaked into the polybag, food arrived lukewarm.',
-        'Rating': 2,
-        'Review Date': '2026-10-14',
-        'Platform': 'Swiggy',
-      },
-      {
-        'Restaurant Name': restaurantName || 'Neelam Restaurants',
-        'Product Name': '', // General restaurant review example
-        'Customer Review': 'Great dining experience, courteous service and quick seating.',
-        'Rating': 5,
-        'Review Date': '2026-10-15',
-        'Platform': 'Google',
+        'Product Name': 'Crispy Corn',
+        'Customer Review': 'Turned soggy by the time delivery boy reached. Needs ventilated container.',
+        'Rating': 3,
+        'Review Date': '2026-11-06',
+        'Platform': 'Zomato',
       },
     ];
 
@@ -128,9 +129,9 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample Reviews');
 
     if (format === 'xlsx') {
-      XLSX.writeFile(workbook, 'SellSense_Reviews_Sample_Template.xlsx');
+      XLSX.writeFile(workbook, 'SellSense_Sample_Reviews_Template.xlsx');
     } else {
-      XLSX.writeFile(workbook, 'SellSense_Reviews_Sample_Template.csv', { bookType: 'csv' });
+      XLSX.writeFile(workbook, 'SellSense_Sample_Reviews_Template.csv', { bookType: 'csv' });
     }
   };
 
@@ -169,10 +170,9 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
     setError(null);
     setImportResult(null);
 
-    // Validate size (max 10MB)
     const MAX_SIZE = 10 * 1024 * 1024;
     if (uploadedFile.size > MAX_SIZE) {
-      setError('File size exceeds the 10 MB limit. Please select a smaller file.');
+      setError('File size exceeds the 10 MB limit. Please select a smaller spreadsheet file.');
       return;
     }
 
@@ -180,7 +180,7 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
     const fileNameLower = uploadedFile.name.toLowerCase();
     const isValidExtension = validExtensions.some(ext => fileNameLower.endsWith(ext));
     if (!isValidExtension) {
-      setError('Unsupported file type. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
+      setError('Please upload an Excel spreadsheet (.xlsx, .xls) or CSV (.csv) file.');
       return;
     }
 
@@ -189,7 +189,6 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
 
     try {
       const buffer = await uploadedFile.arrayBuffer();
-      // Safe parsing: disable formula evaluation & macro execution, enable date parsing
       const workbook = XLSX.read(buffer, {
         type: 'array',
         cellFormula: false,
@@ -199,14 +198,14 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
 
       const firstSheetName = workbook.SheetNames[0];
       if (!firstSheetName) {
-        throw new Error('Spreadsheet contains no sheets');
+        throw new Error('Spreadsheet has no sheets');
       }
 
       const worksheet = workbook.Sheets[firstSheetName];
       const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
       if (rows.length === 0) {
-        throw new Error('Spreadsheet has no data rows to import');
+        throw new Error('The selected sheet is empty. Please check your file.');
       }
 
       const headers = Object.keys(rows[0] || {});
@@ -219,7 +218,7 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
       validateAndApplyMapping(rows, detected);
     } catch (err: any) {
       console.error('File parse error:', err);
-      setError(err?.message || 'Failed to parse spreadsheet file.');
+      setError(err?.message || 'Failed to read spreadsheet file.');
     } finally {
       setParsing(false);
     }
@@ -234,7 +233,7 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
       const productName = mapping.productName ? String(row[mapping.productName] || '').trim() : '';
       const customerReview = mapping.customerReview ? String(row[mapping.customerReview] || '').trim() : '';
       const rawRating = mapping.rating ? row[mapping.rating] : null;
-      
+
       let reviewDate = '';
       if (mapping.reviewDate && row[mapping.reviewDate]) {
         const val = row[mapping.reviewDate];
@@ -245,19 +244,19 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
         }
       }
 
-      const platform = mapping.platform ? String(row[mapping.platform] || '').trim() : 'Uploaded Data';
+      const platform = mapping.platform ? String(row[mapping.platform] || '').trim() : 'Spreadsheet';
 
       const errors: string[] = [];
       let rating: number | null = null;
 
       if (!customerReview) {
-        errors.push('Customer Review is empty');
+        errors.push('Review text is empty');
       }
 
       if (rawRating !== null && rawRating !== undefined && rawRating !== '') {
         const num = Number(rawRating);
         if (isNaN(num) || num < 1 || num > 5) {
-          errors.push('Rating must be between 1 and 5');
+          errors.push('Rating must be 1 to 5');
         } else {
           rating = Math.round(num);
         }
@@ -271,7 +270,7 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
         customerReview,
         rating,
         reviewDate: reviewDate || new Date().toISOString().split('T')[0],
-        platform: platform || 'Uploaded Data',
+        platform: platform || 'Uploaded File',
         isValid: errors.length === 0,
         errors,
         isGeneral,
@@ -281,19 +280,12 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
     setParsedRows(validated);
   };
 
-  // Handle column mapping changes
   const handleMappingChange = (field: keyof typeof columnMapping, headerName: string) => {
     const updated = { ...columnMapping, [field]: headerName };
     setColumnMapping(updated);
     validateAndApplyMapping(rawRows, updated);
   };
 
-  // Remove single row
-  const handleRemoveRow = (index: number) => {
-    setParsedRows(prev => prev.filter(r => r.index !== index));
-  };
-
-  // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -311,7 +303,6 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
     }
   };
 
-  // Reset file
   const handleReset = () => {
     setFile(null);
     setRawRows([]);
@@ -319,24 +310,24 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
     setAvailableHeaders([]);
     setError(null);
     setImportResult(null);
+    setShowAdvancedMapping(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Submit valid reviews to backend with local fallback protection
+  // Submit valid reviews to backend strictly scoped to the active restaurant
   const handleConfirmImport = async () => {
     const validRows = parsedRows.filter(r => r.isValid);
     if (validRows.length === 0) {
-      setError('There are no valid rows to import. Please review your column mapping.');
+      setError('No valid rows found to import. Please make sure your sheet has review text.');
       return;
     }
 
     setImporting(true);
     setError(null);
 
-    const targetRestaurantId = restaurantId || 'restaurant_nelam_001';
     const payload = {
-      restaurantId: targetRestaurantId,
-      restaurantName: restaurantName || 'Nelam Restaurants',
+      restaurantId: resolvedRestaurantId,
+      restaurantName: resolvedRestaurantName,
       filename: file?.name || 'uploaded_reviews.xlsx',
       fileType: file?.name?.endsWith('.csv') ? 'csv' : 'xlsx',
       reviews: validRows.map(r => ({
@@ -361,11 +352,10 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
         result = await backendApi.importManualReviews(payload);
       } catch (backendErr: any) {
         console.warn('Backend server import unavailable, performing local storage fallback:', backendErr);
-        
-        // Extract unique product names
+
         const productsSet = new Set<string>();
         const productStats: Record<string, { total: number; pos: number; neg: number; neu: number }> = {};
-        
+
         const positiveKeywords = ['tasty', 'delicious', 'great', 'good', 'amazing', 'love', 'loved', 'fresh', 'crispy', 'soft', 'best', 'excellent', 'superb', 'hot', 'yum'];
         const negativeKeywords = ['bad', 'cold', 'leak', 'spill', 'rubber', 'chewy', 'salty', 'bland', 'stale', 'late', 'delay', 'slow', 'oily', 'burnt', 'raw', 'terrible'];
 
@@ -392,7 +382,7 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
 
           return {
             id: `mrev_local_${Date.now()}_${i}`,
-            restaurant_id: targetRestaurantId,
+            restaurant_id: resolvedRestaurantId,
             batch_id: `batch_local_${Date.now()}`,
             product_name: pName || 'General Restaurant Review',
             customer_review: r.customerReview,
@@ -405,20 +395,20 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
           };
         });
 
-        // Save into local storage
+        // Save into local storage scoped strictly to this user's restaurant
         try {
-          const storedReviewsRaw = localStorage.getItem(`sellsense_manual_reviews_${targetRestaurantId}`);
+          const storedReviewsRaw = localStorage.getItem(`sellsense_manual_reviews_${resolvedRestaurantId}`);
           const storedReviews = storedReviewsRaw ? JSON.parse(storedReviewsRaw) : [];
-          localStorage.setItem(`sellsense_manual_reviews_${targetRestaurantId}`, JSON.stringify([...storedReviews, ...localReviewItems]));
+          localStorage.setItem(`sellsense_manual_reviews_${resolvedRestaurantId}`, JSON.stringify([...storedReviews, ...localReviewItems]));
 
-          const storedProdsRaw = localStorage.getItem(`sellsense_uploaded_products_${targetRestaurantId}`);
+          const storedProdsRaw = localStorage.getItem(`sellsense_uploaded_products_${resolvedRestaurantId}`);
           const storedProds = storedProdsRaw ? JSON.parse(storedProdsRaw) : [];
 
           const newProductsList = Array.from(productsSet).map((name, idx) => {
             const s = productStats[name] || { total: 1, pos: 1, neg: 0, neu: 0 };
             return {
               id: `prod_local_${Date.now()}_${idx}`,
-              restaurantId: targetRestaurantId,
+              restaurantId: resolvedRestaurantId,
               name,
               category: 'Main Course',
               platforms: ['Spreadsheet / CSV'],
@@ -431,7 +421,6 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
             };
           });
 
-          // Merge by name
           const mergedProducts = [...storedProds];
           for (const np of newProductsList) {
             const matchIndex = mergedProducts.findIndex((p: any) => p.name.toLowerCase() === np.name.toLowerCase());
@@ -447,7 +436,7 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
               mergedProducts.push(np);
             }
           }
-          localStorage.setItem(`sellsense_uploaded_products_${targetRestaurantId}`, JSON.stringify(mergedProducts));
+          localStorage.setItem(`sellsense_uploaded_products_${resolvedRestaurantId}`, JSON.stringify(mergedProducts));
         } catch (storageErr) {
           console.warn('LocalStorage save error:', storageErr);
         }
@@ -476,7 +465,7 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
       console.error('Import reviews error:', err);
       const msg = err?.message || '';
       if (msg.includes('Failed to fetch') || msg.includes('Cannot connect')) {
-        setError('Cannot connect to SellSense backend server (http://localhost:3001). Please make sure the backend server is running.');
+        setError('Cannot connect to SellSense backend server (http://localhost:3001). Please make sure the server is running.');
       } else {
         setError(msg || 'Failed to import reviews. Please try again.');
       }
@@ -486,27 +475,22 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
   };
 
   const validCount = parsedRows.filter(r => r.isValid).length;
-  const invalidCount = parsedRows.filter(r => !r.isValid).length;
-  const filteredRows = parsedRows.filter(r => {
-    if (filterView === 'valid') return r.isValid;
-    if (filterView === 'invalid') return !r.isValid;
-    return true;
-  });
+  const uniqueDishes = Array.from(new Set(parsedRows.filter(r => r.isValid && !r.isGeneral).map(r => r.productName)));
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
-        
-        {/* Header */}
+      <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+
+        {/* Modal Header */}
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-lime-400 to-cyan-500 flex items-center justify-center text-white shadow-md">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-lime-400 to-emerald-500 flex items-center justify-center text-slate-950 font-bold shadow-sm">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Upload Customer Reviews</h2>
+              <h2 className="text-xl font-bold text-slate-900">Upload Customer Reviews Sheet</h2>
               <p className="text-xs text-slate-500">
-                Import spreadsheet reviews (.xlsx, .xls, .csv) for AI-powered product sentiment analysis
+                Easily import your Excel or CSV customer reviews to analyze sentiment across dishes
               </p>
             </div>
           </div>
@@ -518,76 +502,80 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
           </button>
         </div>
 
-        {/* Content Body */}
+        {/* Modal Body */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1">
 
-          {/* Success Banner */}
+          {/* Success Screen */}
           {importResult && (
-            <div className="p-6 bg-gradient-to-br from-lime-50 to-emerald-50 rounded-2xl border border-lime-200 text-slate-800 space-y-4">
+            <div className="p-6 bg-gradient-to-br from-lime-50 via-emerald-50 to-teal-50 rounded-2xl border border-lime-200 text-slate-800 space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-lime-400 text-slate-950 flex items-center justify-center font-bold">
-                  <Check className="w-6 h-6 stroke-[3]" />
+                <div className="w-12 h-12 rounded-2xl bg-lime-400 text-slate-950 flex items-center justify-center font-bold shadow-md">
+                  <Check className="w-7 h-7 stroke-[3]" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Reviews Successfully Imported!</h3>
+                  <h3 className="text-xl font-bold text-slate-900">Import Successful!</h3>
                   <p className="text-sm text-slate-600">
-                    Imported <strong>{importResult.importedCount}</strong> customer reviews across <strong>{importResult.productsWithReviews.length}</strong> food products.
+                    Imported <strong>{importResult.importedCount}</strong> customer reviews across <strong>{importResult.productsWithReviews.length}</strong> food items.
                   </p>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2 pt-2">
-                {importResult.productsWithReviews.slice(0, 6).map((prod, i) => (
-                  <span key={i} className="px-3 py-1 bg-white border border-lime-300 rounded-full text-xs font-semibold text-lime-800 shadow-sm">
-                    🍽️ {prod}
-                  </span>
-                ))}
-                {importResult.productsWithReviews.length > 6 && (
-                  <span className="px-2 py-1 text-xs text-slate-500">
-                    +{importResult.productsWithReviews.length - 6} more
-                  </span>
-                )}
-              </div>
+
+              {importResult.productsWithReviews.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {importResult.productsWithReviews.slice(0, 8).map((prod, i) => (
+                    <span key={i} className="px-3 py-1 bg-white border border-lime-300 rounded-full text-xs font-semibold text-lime-800 shadow-sm">
+                      🍽️ {prod}
+                    </span>
+                  ))}
+                  {importResult.productsWithReviews.length > 8 && (
+                    <span className="px-2 py-1 text-xs text-slate-500">
+                      +{importResult.productsWithReviews.length - 8} more
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="flex justify-end gap-3 pt-3">
                 <Button variant="secondary" onClick={handleReset}>
                   Upload Another File
                 </Button>
                 <Button onClick={onClose} className="bg-lime-400 hover:bg-lime-500 text-slate-950 font-black">
-                  View & Analyze Products <ArrowRight className="w-4 h-4 ml-1 inline" />
+                  View Analysis Dashboard <ArrowRight className="w-4 h-4 ml-1 inline" />
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Upload Area when no file is selected */}
+          {/* Upload Area when no file is chosen yet */}
           {!file && !importResult && (
-            <div className="space-y-6">
-              {/* Instructions & Template Download Bar */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-3 text-sm text-slate-600">
-                  <HelpCircle className="w-5 h-5 text-lime-600 flex-shrink-0" />
-                  <span>Need the standard template? Columns: <strong>Product Name</strong>, <strong>Customer Review</strong>, Rating, Platform, Date.</span>
+            <div className="space-y-5">
+              {/* Simplified Template Banner */}
+              <div className="p-4 bg-gradient-to-r from-lime-50 to-emerald-50 border border-lime-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 text-xs text-slate-700">
+                  <HelpCircle className="w-4 h-4 text-lime-600 flex-shrink-0" />
+                  <span>Don't have a format? Download our ready-to-use sample template:</span>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Button
                     size="small"
                     variant="outline"
                     onClick={() => handleDownloadTemplate('xlsx')}
-                    className="border-slate-300 hover:border-lime-500 text-slate-700"
+                    className="bg-white border-lime-300 hover:bg-lime-100 text-slate-800 text-xs font-bold"
                   >
-                    <Download className="w-4 h-4 mr-1 text-lime-600" /> Excel (.xlsx)
+                    <Download className="w-3.5 h-3.5 mr-1 text-lime-600" /> Sample Excel (.xlsx)
                   </Button>
                   <Button
                     size="small"
                     variant="outline"
                     onClick={() => handleDownloadTemplate('csv')}
-                    className="border-slate-300 hover:border-lime-500 text-slate-700"
+                    className="bg-white border-lime-300 hover:bg-lime-100 text-slate-800 text-xs font-bold"
                   >
-                    <Download className="w-4 h-4 mr-1 text-cyan-600" /> CSV
+                    <Download className="w-3.5 h-3.5 mr-1 text-emerald-600" /> Sample CSV
                   </Button>
                 </div>
               </div>
 
-              {/* Drag & Drop Zone */}
+              {/* Drag and Drop Dropzone */}
               <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -595,8 +583,8 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
                 onClick={() => fileInputRef.current?.click()}
                 className={`border-2 border-dashed rounded-3xl p-10 text-center cursor-pointer transition-all ${
                   isDragging
-                    ? 'border-lime-500 bg-lime-50/50 scale-[1.01]'
-                    : 'border-slate-300 hover:border-lime-400 bg-slate-50/50 hover:bg-slate-50'
+                    ? 'border-lime-500 bg-lime-50/60 scale-[1.01]'
+                    : 'border-slate-300 hover:border-lime-500 bg-slate-50/60 hover:bg-lime-50/20'
                 }`}
               >
                 <input
@@ -614,30 +602,20 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
                   <Upload className="w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mb-1">
-                  Drag & drop your review spreadsheet here
+                  Drag & drop your Excel or CSV sheet here
                 </h3>
-                <p className="text-sm text-slate-500 mb-4">
-                  Supports <strong>.xlsx</strong>, <strong>.xls</strong>, or <strong>.csv</strong> files up to 10 MB
+                <p className="text-xs text-slate-500 mb-5">
+                  Supports .xlsx, .xls, and .csv files. Columns like <strong>Product Name</strong> and <strong>Customer Review</strong> are auto-detected!
                 </p>
-                <Button size="medium" type="button" className="bg-lime-400 hover:bg-lime-500 text-slate-950 font-black">
-                  Browse Computer
+                <Button size="medium" type="button" className="bg-lime-400 hover:bg-lime-500 text-slate-950 font-black px-6">
+                  Select File from Computer
                 </Button>
               </div>
 
-              {/* Security & Format Features Notice */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-500 pt-2">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-lime-500" />
-                  <span>Auto-detects column names</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-lime-500" />
-                  <span>Macro-safe parsing</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-lime-500" />
-                  <span>Filtres duplicates automatically</span>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-500 text-center pt-1">
+                <span className="flex items-center justify-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-lime-600" /> Auto-column detection</span>
+                <span className="flex items-center justify-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-lime-600" /> Instant data preview</span>
+                <span className="flex items-center justify-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-lime-600" /> Private & user-isolated</span>
               </div>
             </div>
           )}
@@ -646,232 +624,134 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
           {parsing && (
             <div className="py-16 text-center space-y-3">
               <RefreshCw className="w-8 h-8 text-lime-500 animate-spin mx-auto" />
-              <p className="text-slate-700 font-semibold">Reading spreadsheet rows & validating data...</p>
+              <p className="text-slate-700 font-semibold">Reading spreadsheet rows & detecting columns...</p>
             </div>
           )}
 
-          {/* File Selected & Preview Mode */}
+          {/* File Selected — Simple 2-Step Confirmation */}
           {file && !parsing && !importResult && (
-            <div className="space-y-6">
-
+            <div className="space-y-5">
               {/* File Info Bar */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200 gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200 gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-white rounded-xl shadow-sm text-lime-600 border border-slate-200">
+                  <div className="p-2.5 bg-white rounded-xl shadow-sm text-lime-600 border border-slate-200">
                     <FileSpreadsheet className="w-6 h-6" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-slate-900">{file.name}</h4>
+                    <h4 className="font-bold text-slate-900 text-sm">{file.name}</h4>
                     <p className="text-xs text-slate-500">
-                      {(file.size / 1024).toFixed(1)} KB • {rawRows.length} total rows detected
+                      {(file.size / 1024).toFixed(1)} KB • {rawRows.length} total rows
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="small" onClick={handleReset} className="text-red-600 hover:bg-red-50">
-                    <Trash2 className="w-4 h-4 mr-1" /> Choose Different File
-                  </Button>
+                <Button variant="ghost" size="small" onClick={handleReset} className="text-slate-500 hover:text-red-600 text-xs">
+                  Change File
+                </Button>
+              </div>
+
+              {/* Ready to Import Stat Banner */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="p-3 bg-lime-50 border border-lime-200 rounded-xl">
+                  <span className="text-[11px] font-semibold text-lime-800 uppercase tracking-wider block">Valid Reviews</span>
+                  <span className="text-2xl font-black text-lime-900">{validCount}</span>
+                </div>
+                <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-xl">
+                  <span className="text-[11px] font-semibold text-cyan-800 uppercase tracking-wider block">Food Items Found</span>
+                  <span className="text-2xl font-black text-cyan-900">{uniqueDishes.length}</span>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl col-span-2 sm:col-span-1">
+                  <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider block">Auto-Detected Fields</span>
+                  <span className="text-xs font-bold text-slate-800 mt-1 block">
+                    {columnMapping.productName ? 'Dish Name' : 'None'}, {columnMapping.customerReview ? 'Review' : 'None'}
+                  </span>
                 </div>
               </div>
 
-              {/* Column Mapping Selectors */}
-              <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-lime-600" />
-                    Map Spreadsheet Columns to SellSense Fields
-                  </h4>
-                  <span className="text-xs text-slate-500">Adjust dropdowns if headers differ</span>
-                </div>
+              {/* Optional Advanced Column Mapping Toggle */}
+              <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedMapping(!showAdvancedMapping)}
+                  className="w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 flex items-center justify-between text-xs font-bold text-slate-700 transition"
+                >
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-lime-600" />
+                    Customize Column Mapping (Optional)
+                  </span>
+                  {showAdvancedMapping ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Product / Dish Name <span className="text-slate-400 font-normal">(Optional for general)</span>
-                    </label>
-                    <select
-                      value={columnMapping.productName}
-                      onChange={(e) => handleMappingChange('productName', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-lime-500 focus:outline-none"
-                    >
-                      <option value="">-- No Product Name (General Review) --</option>
-                      {availableHeaders.map(h => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                  </div>
+                {showAdvancedMapping && (
+                  <div className="p-4 bg-white grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 border-t border-slate-200 text-xs">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Product / Dish Column</label>
+                      <select
+                        value={columnMapping.productName}
+                        onChange={(e) => handleMappingChange('productName', e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs"
+                      >
+                        <option value="">-- General Review --</option>
+                        {availableHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Customer Review Text <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={columnMapping.customerReview}
-                      onChange={(e) => handleMappingChange('customerReview', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-lime-500 focus:outline-none"
-                    >
-                      <option value="">-- Select Review Column --</option>
-                      {availableHeaders.map(h => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                  </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Review Text Column *</label>
+                      <select
+                        value={columnMapping.customerReview}
+                        onChange={(e) => handleMappingChange('customerReview', e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs"
+                      >
+                        <option value="">-- Select Column --</option>
+                        {availableHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Rating (1 to 5) <span className="text-slate-400 font-normal">(Optional)</span>
-                    </label>
-                    <select
-                      value={columnMapping.rating}
-                      onChange={(e) => handleMappingChange('rating', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-lime-500 focus:outline-none"
-                    >
-                      <option value="">-- Optional / None --</option>
-                      {availableHeaders.map(h => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Review Date <span className="text-slate-400 font-normal">(Optional)</span>
-                    </label>
-                    <select
-                      value={columnMapping.reviewDate}
-                      onChange={(e) => handleMappingChange('reviewDate', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-lime-500 focus:outline-none"
-                    >
-                      <option value="">-- Optional / Current Date --</option>
-                      {availableHeaders.map(h => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Platform Source <span className="text-slate-400 font-normal">(Zomato/Swiggy/Google)</span>
-                    </label>
-                    <select
-                      value={columnMapping.platform}
-                      onChange={(e) => handleMappingChange('platform', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-lime-500 focus:outline-none"
-                    >
-                      <option value="">-- Optional (Uploaded Data) --</option>
-                      {availableHeaders.map(h => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Validation Summary & Filter Tabs */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setFilterView('all')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
-                      filterView === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    All Rows ({parsedRows.length})
-                  </button>
-                  <button
-                    onClick={() => setFilterView('valid')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
-                      filterView === 'valid' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'
-                    }`}
-                  >
-                    Valid ({validCount})
-                  </button>
-                  {invalidCount > 0 && (
-                    <button
-                      onClick={() => setFilterView('invalid')}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
-                        filterView === 'invalid' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'
-                      }`}
-                    >
-                      Invalid ({invalidCount})
-                    </button>
-                  )}
-                </div>
-
-                <div className="text-xs text-slate-500">
-                  Ready to import: <strong>{validCount}</strong> reviews
-                </div>
-              </div>
-
-              {/* Data Preview Table */}
-              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                <div className="max-h-64 overflow-y-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold sticky top-0 z-10">
-                      <tr>
-                        <th className="px-4 py-2.5 w-16">Status</th>
-                        <th className="px-4 py-2.5 w-36">Product Name</th>
-                        <th className="px-4 py-2.5">Customer Review</th>
-                        <th className="px-4 py-2.5 w-20">Rating</th>
-                        <th className="px-4 py-2.5 w-24">Platform</th>
-                        <th className="px-4 py-2.5 w-12 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredRows.slice(0, 50).map((row) => (
-                        <tr key={row.index} className={row.isValid ? 'hover:bg-slate-50/80' : 'bg-red-50/40 hover:bg-red-50/60'}>
-                          <td className="px-4 py-2.5">
-                            {row.isValid ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] text-green-700 font-semibold">
-                                <CheckCircle className="w-3.5 h-3.5 text-green-600" />
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[11px] text-red-600 font-semibold" title={row.errors.join(', ')}>
-                                <AlertTriangle className="w-3.5 h-3.5" />
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 font-medium text-slate-800">
-                            {row.isGeneral ? (
-                              <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded text-[10px] font-bold">General Review</span>
-                            ) : (
-                              row.productName
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 text-slate-600 max-w-xs truncate" title={row.customerReview}>
-                            {row.customerReview || <span className="text-red-400 italic">Missing review</span>}
-                          </td>
-                          <td className="px-4 py-2.5 font-medium">
-                            {row.rating ? (
-                              <span className="text-amber-500 font-bold">{row.rating} ★</span>
-                            ) : (
-                              <span className="text-slate-400">N/A</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 text-slate-500">
-                            <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-semibold text-slate-600">
-                              {row.platform}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-right">
-                            <button
-                              onClick={() => handleRemoveRow(row.index)}
-                              className="text-slate-400 hover:text-red-600 p-1 rounded"
-                              title="Remove row"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {filteredRows.length > 50 && (
-                  <div className="p-2.5 text-center text-xs text-slate-500 bg-slate-50 border-t border-slate-100">
-                    Showing first 50 rows of {filteredRows.length}. All valid rows will be imported.
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Rating Column (1-5)</label>
+                      <select
+                        value={columnMapping.rating}
+                        onChange={(e) => handleMappingChange('rating', e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs"
+                      >
+                        <option value="">-- Optional --</option>
+                        {availableHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
                   </div>
                 )}
+              </div>
+
+              {/* Quick Sample Preview */}
+              <div>
+                <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  Sample Data Preview (First 5 Rows)
+                </h5>
+                <div className="space-y-2">
+                  {parsedRows.slice(0, 5).map((r) => (
+                    <div key={r.index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-start justify-between gap-3 text-xs">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                            {r.productName}
+                          </span>
+                          {r.rating && (
+                            <span className="text-amber-500 font-bold">★ {r.rating}</span>
+                          )}
+                          <span className="text-slate-400 text-[10px]">{r.platform}</span>
+                        </div>
+                        <p className="text-slate-600 italic line-clamp-2">"{r.customerReview}"</p>
+                      </div>
+                      {r.isValid ? (
+                        <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-1" />
+                      ) : (
+                        <span title={r.errors.join(', ')}>
+                          <AlertTriangle className="w-4 h-4 text-rose-500 flex-shrink-0 mt-1" />
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -885,10 +765,10 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
           )}
         </div>
 
-        {/* Footer Actions */}
+        {/* Modal Footer */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
           <Button variant="ghost" onClick={onClose} disabled={importing}>
-            Cancel Upload
+            Cancel
           </Button>
 
           {file && !importResult && (
@@ -899,14 +779,14 @@ export const UploadReviewsModal: React.FC<UploadReviewsModalProps> = ({
               <Button
                 onClick={handleConfirmImport}
                 disabled={importing || validCount === 0}
-                className="bg-lime-400 hover:bg-lime-500 text-slate-950 font-black"
+                className="bg-lime-400 hover:bg-lime-500 text-slate-950 font-black px-6 shadow-md"
               >
                 {importing ? (
                   <span className="flex items-center gap-2">
-                    <RefreshCw className="w-4 h-4 animate-spin" /> Importing Reviews...
+                    <RefreshCw className="w-4 h-4 animate-spin" /> Importing...
                   </span>
                 ) : (
-                  `Import ${validCount} Valid Reviews`
+                  `🚀 Import ${validCount} Reviews Now`
                 )}
               </Button>
             </div>

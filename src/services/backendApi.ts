@@ -37,14 +37,14 @@ class BackendApiService {
   }
 
   // ============ AUTH ============
-  async login(email: string, password: string): Promise<{ user: any; token: string }> {
+  async login(email: string, password: string): Promise<{ user: any; restaurant?: any; token: string }> {
     return this.request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
   }
 
-  async signup(data: { email: string; password: string; fullName: string }): Promise<{ user: any; token: string }> {
+  async signup(data: { email: string; password: string; fullName: string }): Promise<{ user: any; restaurant?: any; token: string }> {
     return this.request('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -60,6 +60,44 @@ class BackendApiService {
     return this.request('/auth/google', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  async getMe(): Promise<{ user: any; restaurant: any | null }> {
+    return this.request('/auth/me');
+  }
+
+  async updateProfile(data: { fullName: string; phone?: string }): Promise<{ success: boolean; user: any; message: string }> {
+    return this.request('/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async changePassword(data: { currentPassword: string; newPassword: string }): Promise<{ success: boolean; message: string }> {
+    return this.request('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateRestaurantDetails(data: any): Promise<{ success: boolean; restaurant: any; message: string }> {
+    return this.request('/auth/restaurant', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async grantUserPremium(userId: string, durationDays = 30): Promise<{ success: boolean; message: string }> {
+    return this.request(`/admin/users/${userId}/grant-premium`, {
+      method: 'POST',
+      body: JSON.stringify({ durationDays }),
+    });
+  }
+
+  async revokeUserPremium(userId: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/admin/users/${userId}/revoke-premium`, {
+      method: 'POST',
     });
   }
 

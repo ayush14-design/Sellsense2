@@ -28,13 +28,8 @@ export const ZomatoConnectPage: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Check API mode on mount and redirect admins directly to /admin
+  // Check API mode on mount
   useEffect(() => {
-    const user = authStorage.getUser();
-    if (user?.role === 'super_admin' || user?.role === 'admin' || user?.email === 'admin@sellsense.ai') {
-      navigate('/admin', { replace: true });
-      return;
-    }
     const config = zomatoApi.getConnectionInfo();
     setApiMode(config.demoMode ? 'demo' : 'real');
   }, [navigate]);

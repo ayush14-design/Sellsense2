@@ -309,6 +309,30 @@ router.post('/users/:id/grant-premium', (req: AuthRequest, res: Response) => {
   }
 });
 
+router.post('/users/:id/revoke-premium', (req: AuthRequest, res: Response) => {
+  ensureDbInitialized();
+
+  try {
+    const { id } = req.params;
+
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined;
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    db.prepare("UPDATE subscriptions SET status = 'suspended', admin_note = 'Revoked by admin' WHERE user_id = ?").run(id);
+    db.prepare("UPDATE payment_requests SET status = 'rejected', admin_reason = 'Revoked by admin' WHERE user_id = ? AND status = 'approved'").run(id);
+    db.prepare('DELETE FROM user_feature_overrides WHERE user_id = ?').run(id);
+
+    logAudit(req.user!.id, 'revoke_user_premium', 'user', id, null, { status: 'suspended' }, 'Admin revoked premium features');
+
+    res.json({ success: true, message: `Premium features revoked for ${user.full_name}.` });
+  } catch (error) {
+    console.error('Revoke user premium error:', error);
+    res.status(500).json({ error: 'Failed to revoke user premium features' });
+  }
+});
+
 router.delete('/users/:id', (req: AuthRequest, res: Response) => {
   ensureDbInitialized();
 
@@ -596,7 +620,7 @@ router.post('/payments/:id/grant-premium', (req: AuthRequest, res: Response) => 
 
     let payment = db.prepare('SELECT * FROM payment_requests WHERE id = ?').get(id) as PaymentRequestRow | undefined;
     if (!payment) {
-      const defaultUser = db.prepare("SELECT * FROM users WHERE role = 'restaurant_owner' OR email != 'admin@sellsense.ai' LIMIT 1").get() as any;
+      const defaultUser = db.prepare("SELECT * FROM users WHERE role = 'restaurant_owner' OR email != 'ayushmandalkar14@gmail.com' LIMIT 1").get() as any;
       const defaultRest = db.prepare("SELECT * FROM restaurants LIMIT 1").get() as any;
       const targetUserId = req.body?.userId || defaultUser?.id || 'user_demo_001';
       const targetRestId = req.body?.restaurantId || defaultRest?.id || 'rest_demo_001';

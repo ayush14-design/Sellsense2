@@ -74,7 +74,7 @@ export const AdminPage: React.FC = () => {
 
   // Check admin access
   useEffect(() => {
-    const isAdmin = currentUser?.role === 'super_admin' || currentUser?.role === 'admin' || currentUser?.email === 'admin@sellsense.ai';
+    const isAdmin = currentUser?.role === 'super_admin' || currentUser?.email?.toLowerCase() === 'ayushmandalkar14@gmail.com';
     if (!currentUser || !isAdmin) {
       navigate('/login');
     } else {
@@ -577,29 +577,46 @@ export const AdminPage: React.FC = () => {
           )},
           { key: 'role', header: 'Role', render: (u: any) => <RoleBadge role={u.role} /> },
           { key: 'status', header: 'Status', render: (u: any) => <StatusBadge status={u.status || (u.is_active ? 'active' : 'inactive')} /> },
+          { key: 'access', header: 'Access Status', render: (u: any) => (
+            <div>
+              {u.active_subscriptions > 0 ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">
+                  <CheckCircle className="w-3.5 h-3.5" /> Premium Active
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">
+                  Free Tier
+                </span>
+              )}
+            </div>
+          )},
           { key: 'restaurants', header: 'Restaurants', render: (u: any) => (
             <span className="text-sm text-slate-500">{u.restaurant_count || 0}</span>
           )},
-          { key: 'subscriptions', header: 'Active Subs', render: (u: any) => (
-            <span className="text-sm text-slate-500">{u.active_subscriptions || 0}</span>
-          )},
-          { key: 'lastLogin', header: 'Last Login', render: (u: any) => <span className="text-sm text-slate-500">{formatDate(u.last_login_at)}</span> },
           { key: 'joined', header: 'Joined', render: (u: any) => <span className="text-sm text-slate-500">{formatDate(u.created_at)}</span> },
-          { key: 'actions', header: 'Actions', render: (u: any) => (
+          { key: 'actions', header: 'Admin Access Control', render: (u: any) => (
             <div className="flex items-center justify-end gap-1.5">
-              <Button
-                variant="ghost"
-                size="small"
-                className="text-lime-600 hover:bg-lime-50"
-                title="Grant Premium Features Permission"
-                onClick={() => handleGrantUserPremium(u)}
-              >
-                <ShieldCheck className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="small" onClick={() => navigate(`/admin/users/${u.id}`)}>
+              {u.active_subscriptions > 0 ? (
+                <button
+                  onClick={() => handleRevokeUserPremiumDirect(u)}
+                  className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition flex items-center gap-1 border border-rose-200"
+                  title="Revoke premium access immediately"
+                >
+                  <Lock className="w-3.5 h-3.5" /> Revoke
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleGrantUserPremium(u)}
+                  className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                  title="Grant premium features access"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" /> Grant Access
+                </button>
+              )}
+              <Button variant="ghost" size="small" onClick={() => navigate(`/admin/users/${u.id}`)} title="View User">
                 <Eye className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="small" className="text-red-600 hover:bg-red-50" onClick={() => handleDeleteUser(u.id)}>
+              <Button variant="ghost" size="small" className="text-red-600 hover:bg-red-50" onClick={() => handleDeleteUser(u.id)} title="Delete User">
                 <Trash2 className="w-4 h-4" />
               </Button>
             </div>
@@ -1363,7 +1380,6 @@ export const AdminPage: React.FC = () => {
           const stored = JSON.parse(localStorage.getItem('sellsense_payment_submissions') || '[]');
           const updated = stored.map((p: any) => p.id === payment.id ? { ...p, status: 'approved', permission_granted: true } : p);
           localStorage.setItem('sellsense_payment_submissions', JSON.stringify(updated));
-          localStorage.setItem('sellsense_features_unlocked', 'true');
         } catch (e) {}
 
         // Immediate optimistic UI update
@@ -1379,7 +1395,6 @@ export const AdminPage: React.FC = () => {
             stored[idx].status = 'approved';
             stored[idx].permission_granted = true;
             localStorage.setItem('sellsense_payment_submissions', JSON.stringify(stored));
-            localStorage.setItem('sellsense_features_unlocked', 'true');
             setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, status: 'approved', has_active_subscription: 1 } : p));
             alert(`Success! Payment marked as DONE and premium features permission granted to ${ownerName} (locally saved).`);
             loadTabData('payments');
@@ -1419,11 +1434,22 @@ export const AdminPage: React.FC = () => {
           durationDays: parseInt(days),
           adminNote: `Manual permission granted by admin for ${days} days`,
         });
-        localStorage.setItem('sellsense_features_unlocked', 'true');
         alert(`Success! Premium features permission granted to ${u.full_name} for ${days} days.`);
         loadTabData('users');
       } catch (err: any) {
         alert(err?.message || 'Failed to grant user premium features');
+      }
+    };
+
+    const handleRevokeUserPremiumDirect = async (u: any) => {
+      const confirmed = window.confirm(`Revoke premium features access for ${u.full_name}? The user will return to Free Tier.`);
+      if (!confirmed) return;
+      try {
+        await backendApi.adminAction(`users/${u.id}/revoke-premium`, {});
+        alert(`Access revoked. ${u.full_name} is now on Free Tier.`);
+        loadTabData('users');
+      } catch (err: any) {
+        alert(err?.message || 'Failed to revoke user premium features');
       }
     };
 

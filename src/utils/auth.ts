@@ -27,12 +27,22 @@ export const authStorage = {
   },
 
   isAuthenticated: (): boolean => {
-    return localStorage.getItem(STORAGE_KEYS.IS_AUTHENTICATED) === 'true';
+    const token = localStorage.getItem('auth_token');
+    const userStr = localStorage.getItem(STORAGE_KEYS.USER);
+    const isAuth = localStorage.getItem(STORAGE_KEYS.IS_AUTHENTICATED);
+    return isAuth === 'true' && !!token && !!userStr;
   },
 
   logout: () => {
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    localStorage.removeItem(STORAGE_KEYS.RESTAURANT);
-    localStorage.removeItem(STORAGE_KEYS.IS_AUTHENTICATED);
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    try {
+      const keys = Object.keys(localStorage);
+      for (const k of keys) {
+        if (k.startsWith('sellsense_')) {
+          localStorage.removeItem(k);
+        }
+      }
+    } catch {}
   },
 };

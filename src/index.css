@@ -7,7 +7,6 @@
   --color-neutral-light: #F8F9FC;
   --color-card-white: #FFFFFF;
   --color-deep-slate: #0F172A;
-  --color-slate-800: #1E293B;
   --color-deep-charcoal: #1E293B;
   --color-muted-gray: #64748B;
   --color-border-light: #E2E8F0;
@@ -59,7 +58,6 @@ body {
 /* Dark mode support */
 .dark {
   --color-deep-slate: #F8F9FC;
-  --color-slate-800: #E2E8F0;
   --color-deep-charcoal: #F8F9FC;
   --color-muted-gray: #94A3B8;
   --color-border-light: #334155;
@@ -1208,21 +1206,18 @@ section {
   animation: textRevealUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* Scroll-triggered classes - Using IntersectionObserver via hooks instead */
+/* Scroll-triggered classes */
 .reveal-on-scroll {
-  opacity: 0;
-  transform: translateY(30px);
-  filter: blur(4px);
-  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-              transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-              filter 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .reveal-on-scroll.is-visible,
 .reveal-on-scroll.visible {
   opacity: 1;
   transform: translateY(0);
-  filter: blur(0);
 }
 
 .reveal-on-scroll.left {
@@ -1660,21 +1655,18 @@ section {
   }
 }
 
-/* Scroll-triggered classes - Using IntersectionObserver via hooks instead */
+/* Scroll-triggered classes */
 .reveal-on-scroll {
-  opacity: 0;
-  transform: translateY(30px);
-  filter: blur(4px);
-  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-              transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-              filter 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .reveal-on-scroll.is-visible,
 .reveal-on-scroll.visible {
   opacity: 1;
   transform: translateY(0);
-  filter: blur(0);
 }
 
 .reveal-on-scroll.left {

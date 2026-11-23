@@ -4,7 +4,7 @@ import { Button } from '../components/Button';
 import { authStorage } from '../utils/auth';
 import { backendApi } from '../services/backendApi';
 import { GoogleAuthModal } from '../components/GoogleAuthModal';
-import { Eye, EyeOff, CheckCircle, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle, ArrowRight, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const SignupPage: React.FC = () => {
@@ -77,8 +77,14 @@ export const SignupPage: React.FC = () => {
       });
 
       if (res?.token && res?.user) {
+        authStorage.logout();
         authStorage.setUser(res.user);
         localStorage.setItem('auth_token', res.token);
+        if (res.restaurant) {
+          authStorage.setRestaurant(res.restaurant);
+        }
+        // Always direct new sign-ups to the guided 3-step setup onboarding wizard
+        localStorage.setItem(`sellsense_setup_done_${res.user.id}`, 'false');
         navigate('/setup');
       } else {
         setError('Signup failed. Invalid response from server.');
@@ -103,7 +109,7 @@ export const SignupPage: React.FC = () => {
         fullName: data.fullName,
       });
 
-      const { user, token, hasRestaurant, restaurant } = res;
+      const { user, token, restaurant } = res;
 
       authStorage.setUser(user);
       localStorage.setItem('auth_token', token);
@@ -113,14 +119,9 @@ export const SignupPage: React.FC = () => {
       }
 
       setGoogleModalOpen(false);
-
-      if (user.role === 'super_admin' || user.email === 'admin@sellsense.ai') {
-        navigate('/admin');
-      } else if (hasRestaurant) {
-        navigate('/products');
-      } else {
-        navigate('/setup');
-      }
+      // New Google signups are guided through the 3-step setup onboarding wizard
+      localStorage.setItem(`sellsense_setup_done_${user.id}`, 'false');
+      navigate('/setup');
     } catch (err: any) {
       setError(err?.message || 'Google signup failed. Please ensure the backend server is running.');
     } finally {
@@ -465,6 +466,16 @@ export const SignupPage: React.FC = () => {
                   Sign in →
                 </Link>
               </motion.p>
+
+              <div className="mt-5 pt-4 border-t border-slate-200/80 text-center">
+                <Link
+                  to="/admin/login"
+                  className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-purple-600 font-medium transition-colors group"
+                >
+                  <Shield size={13} className="text-purple-500 group-hover:scale-110 transition-transform" />
+                  <span>SellSense Staff / Super Admin? <strong>Access Admin Portal &rarr;</strong></span>
+                </Link>
+              </div>
             </div>
           </motion.div>
         </div>

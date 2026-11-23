@@ -1,27 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authStorage } from '../utils/auth';
-import { Menu, X, Brain, ArrowRight, Sun, Moon } from 'lucide-react';
+import { Menu, X, Brain, ArrowRight, Sun, Moon, ShieldCheck } from 'lucide-react';
 import { isDarkMode, setTheme, subscribeThemeChange } from '../utils/theme';
 
 export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const isAuthenticated = authStorage.isAuthenticated();
+  const user = authStorage.getUser();
+  const isAdmin = user?.role === 'super_admin' || user?.email?.toLowerCase() === 'ayushmandalkar14@gmail.com';
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [dark, setDark] = useState<boolean>(() => isDarkMode());
 
   const handleGetStarted = () => {
-    if (!isAuthenticated) {
-      navigate('/signup');
+    if (authStorage.isAuthenticated()) {
+      navigate('/products');
     } else {
-      const user = authStorage.getUser();
-      if (user?.role === 'super_admin' || user?.email === 'admin@sellsense.ai') {
-        navigate('/admin');
-      } else {
-        // Direct to restaurant setup onboarding rather than skipping straight to products
-        navigate('/setup');
-      }
+      navigate('/login');
     }
   };
 
@@ -67,52 +63,38 @@ export const Navbar: React.FC = () => {
           </Link>
 
           <div className="hidden md:flex items-center gap-10">
-            <div className="flex items-center gap-8">
+            <div className="flex items-center gap-7">
               <button
                 onClick={() => scrollToSection('features')}
-                className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm relative group"
+                className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm relative group cursor-pointer"
               >
                 Features
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-lime-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
               </button>
               <button
-                onClick={() => scrollToSection('ventures')}
-                className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm relative group"
-              >
-                Ventures
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-lime-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-              </button>
-              <button
                 onClick={() => scrollToSection('how-it-works')}
-                className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm relative group"
+                className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm relative group cursor-pointer"
               >
                 How It Works
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-lime-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
               </button>
               <button
-                onClick={() => scrollToSection('roi-calculator')}
-                className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm relative group"
+                onClick={() => scrollToSection('preview')}
+                className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm relative group cursor-pointer"
               >
-                ROI Calculator
+                Live Preview
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-lime-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
               </button>
               <button
-                onClick={() => scrollToSection('dashboard-preview')}
-                className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm relative group"
+                onClick={() => scrollToSection('integrations')}
+                className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm relative group cursor-pointer"
               >
-                Dashboard
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-lime-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-              </button>
-              <button
-                onClick={() => scrollToSection('success-stories')}
-                className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm relative group"
-              >
-                Success Stories
+                Integrations
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-lime-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
               </button>
               <button
                 onClick={() => scrollToSection('faq')}
-                className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm relative group"
+                className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm relative group cursor-pointer"
               >
                 FAQ
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-lime-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
@@ -135,6 +117,16 @@ export const Navbar: React.FC = () => {
                 )}
               </button>
 
+              {isAuthenticated && isAdmin && (
+                <Link
+                  to="/admin"
+                  className="px-3.5 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30 hover:border-purple-500/50 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs"
+                >
+                  <ShieldCheck size={14} />
+                  <span>Admin Portal</span>
+                </Link>
+              )}
+
               {!isAuthenticated && (
                 <Link to="/login" className="text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors font-medium text-sm px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 group">
                   Sign In
@@ -145,7 +137,7 @@ export const Navbar: React.FC = () => {
                 onClick={handleGetStarted}
                 className="px-6 py-2.5 bg-gradient-to-r from-lime-500 to-lime-600 text-white rounded-xl hover:from-lime-600 hover:to-lime-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl group magnetic-btn"
               >
-                Get Started Free
+                {isAuthenticated ? 'Go to Dashboard' : 'Get Started Free'}
                 <ArrowRight className="inline ml-2 transition-transform group-hover:translate-x-1" size={16} />
               </button>
             </div>
@@ -166,18 +158,12 @@ export const Navbar: React.FC = () => {
       {mobileMenuOpen && (
         <div className="md:hidden py-4 border-t border-gray-200 dark:border-slate-700 animate-fade-in-up bg-white dark:bg-slate-900">
           <div className="max-w-7xl mx-auto px-6">
-            <div className="flex flex-col gap-4 pt-4">
+            <div className="flex flex-col gap-2 pt-2">
               <button
                 onClick={() => scrollToSection('features')}
                 className="text-left px-4 py-3 text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-all font-medium"
               >
                 Features
-              </button>
-              <button
-                onClick={() => scrollToSection('ventures')}
-                className="text-left px-4 py-3 text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-all font-medium"
-              >
-                Ventures
               </button>
               <button
                 onClick={() => scrollToSection('how-it-works')}
@@ -186,28 +172,16 @@ export const Navbar: React.FC = () => {
                 How It Works
               </button>
               <button
-                onClick={() => scrollToSection('roi-calculator')}
+                onClick={() => scrollToSection('preview')}
                 className="text-left px-4 py-3 text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-all font-medium"
               >
-                ROI Calculator
+                Live Preview
               </button>
               <button
-                onClick={() => scrollToSection('platforms')}
+                onClick={() => scrollToSection('integrations')}
                 className="text-left px-4 py-3 text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-all font-medium"
               >
                 Integrations
-              </button>
-              <button
-                onClick={() => scrollToSection('dashboard-preview')}
-                className="text-left px-4 py-3 text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-all font-medium"
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => scrollToSection('success-stories')}
-                className="text-left px-4 py-3 text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-all font-medium"
-              >
-                Success Stories
               </button>
               <button
                 onClick={() => scrollToSection('faq')}
@@ -215,6 +189,16 @@ export const Navbar: React.FC = () => {
               >
                 FAQ
               </button>
+
+              {isAuthenticated && isAdmin && (
+                <Link
+                  to="/admin"
+                  className="text-left px-4 py-3 text-purple-600 dark:text-purple-400 bg-purple-50/50 dark:bg-purple-950/20 rounded-xl transition-all font-bold flex items-center gap-2 border border-purple-500/20"
+                >
+                  <ShieldCheck size={16} />
+                  <span>Admin Portal</span>
+                </Link>
+              )}
 
               {!isAuthenticated && (
                 <Link to="/login" className="text-left px-4 py-3 text-slate-700 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-all font-medium">

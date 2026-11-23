@@ -653,14 +653,14 @@ function seedDefaultFeatures() {
 }
 
 function seedDemoUsers() {
-  const existing = db.prepare('SELECT COUNT(*) as count FROM users WHERE email = ?').get('admin@sellsense.ai') as { count: number };
+  const existing = db.prepare('SELECT COUNT(*) as count FROM users WHERE email = ?').get('ayushmandalkar14@gmail.com') as { count: number };
   if (existing.count === 0) {
     const users = [
       {
         id: 'user_admin_001',
-        email: 'admin@sellsense.ai',
-        passwordHash: '$2a$10$demo', // placeholder
-        fullName: 'Super Admin',
+        email: 'ayushmandalkar14@gmail.com',
+        passwordHash: 'Ayush@14.',
+        fullName: 'Ayush Mandalkar',
         role: 'super_admin',
         phone: '+91-9876543210',
         isActive: 1,

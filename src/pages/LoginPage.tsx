@@ -3,27 +3,18 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { authStorage } from '../utils/auth';
 import { backendApi } from '../services/backendApi';
-import { Eye, EyeOff, Sparkles, TrendingUp, Zap, Utensils, Shield, Crown } from 'lucide-react';
+import { Eye, EyeOff, Sparkles, TrendingUp, Zap, Utensils, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { GoogleAuthModal } from '../components/GoogleAuthModal';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const [loginRole, setLoginRole] = useState<'owner' | 'admin'>('owner');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const handleSelectRole = (role: 'owner' | 'admin') => {
-    setLoginRole(role);
-    setError('');
-    // Clear fields when switching roles — no demo prefill
-    setEmail('');
-    setPassword('');
-  };
 
   const [googleModalOpen, setGoogleModalOpen] = useState(false);
 
@@ -38,7 +29,7 @@ export const LoginPage: React.FC = () => {
         fullName: data.fullName,
       });
 
-      const { user, token, hasRestaurant, restaurant } = res;
+      const { user, token, restaurant } = res;
 
       authStorage.setUser(user);
       localStorage.setItem('auth_token', token);
@@ -49,12 +40,11 @@ export const LoginPage: React.FC = () => {
 
       setGoogleModalOpen(false);
 
-      if (user.role === 'super_admin' || user.email === 'admin@sellsense.ai') {
-        navigate('/admin');
-      } else if (hasRestaurant) {
-        navigate('/products');
-      } else {
+      const isSetupDone = localStorage.getItem(`sellsense_setup_done_${user.id}`) === 'true';
+      if (!isSetupDone && (!restaurant?.description || restaurant?.description === 'Restaurant Profile')) {
         navigate('/setup');
+      } else {
+        navigate('/products');
       }
     } catch (err: any) {
       setError(err?.message || 'Google authentication failed. Please ensure the backend server is running.');
@@ -85,21 +75,24 @@ export const LoginPage: React.FC = () => {
     setLoading(true);
 
     try {
+      // Clear any prior local session to ensure complete tenant isolation
+      authStorage.logout();
+
       // Always try real backend login first
-      const loginRes = await backendApi.login(email, password);
+      const loginRes = await backendApi.login(email.trim(), password);
       if (loginRes?.token && loginRes?.user) {
         localStorage.setItem('auth_token', loginRes.token);
         authStorage.setUser(loginRes.user);
 
-        if (loginRes.user.role === 'super_admin' || loginRes.user.email === 'admin@sellsense.ai') {
-          navigate('/admin');
+        if (loginRes.restaurant) {
+          authStorage.setRestaurant(loginRes.restaurant);
+        }
+
+        const isSetupDone = localStorage.getItem(`sellsense_setup_done_${loginRes.user.id}`) === 'true';
+        if (!isSetupDone && (!loginRes.restaurant?.description || loginRes.restaurant?.description === 'Restaurant Profile')) {
+          navigate('/setup');
         } else {
-          const restaurant = authStorage.getRestaurant();
-          if (restaurant) {
-            navigate('/products');
-          } else {
-            navigate('/setup');
-          }
+          navigate('/products');
         }
       } else {
         setError('Login failed. Invalid response from server.');
@@ -215,62 +208,18 @@ export const LoginPage: React.FC = () => {
                   </motion.div>
                 )}
 
-                {/* Two Account Switcher Buttons: Restaurant Owner vs Admin */}
-                <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-2xl mb-2 border border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectRole('owner')}
-                    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${
-                      loginRole === 'owner'
-                        ? 'bg-white text-slate-900 shadow-md border border-lime-400 scale-[1.02]'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Utensils size={18} className={loginRole === 'owner' ? 'text-lime-500' : ''} />
-                    Restaurant Owner
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectRole('admin')}
-                    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${
-                      loginRole === 'admin'
-                        ? 'bg-purple-600 text-white shadow-md scale-[1.02]'
-                        : 'text-slate-600 hover:text-purple-600'
-                    }`}
-                  >
-                    <Shield size={18} className={loginRole === 'admin' ? 'text-white' : ''} />
-                    Admin Access
-                  </button>
-                </div>
-
-                {/* Role Description Badge */}
-                {loginRole === 'admin' ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-purple-50 border border-purple-200 rounded-2xl p-4 text-purple-950"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider bg-purple-200 text-purple-900 px-2.5 py-1 rounded-full">
-                        <Crown size={13} /> Admin Portal Mode
-                      </span>
-                      <span className="text-xs text-purple-700">Directly opens Admin tab</span>
+                {/* Restaurant Portal Badge */}
+                <div className="bg-lime-50/90 border border-lime-200 rounded-2xl p-3.5 text-slate-700 text-xs flex items-center justify-between shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-6 h-6 rounded-lg bg-lime-500/20 text-lime-700 flex items-center justify-center">
+                      <Utensils size={14} />
                     </div>
-                    <p className="text-xs text-purple-800">
-                      Admin login requires valid credentials. Enter your admin email and password below.
-                    </p>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-lime-50 border border-lime-200 rounded-2xl p-3 text-slate-700 text-xs flex items-center"
-                  >
-                    <span className="font-medium text-slate-800">
-                      👨‍🍳 Owner Mode: Manage food products, reviews & subscription.
-                    </span>
-                  </motion.div>
-                )}
+                    <span className="font-bold text-slate-800 text-sm">Restaurant Portal</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200">
+                    Onboarding & Reviews
+                  </span>
+                </div>
 
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -351,11 +300,7 @@ export const LoginPage: React.FC = () => {
                 >
                   <Button
                     type="submit"
-                    className={`w-full text-white font-bold py-4 rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all btn-ripple ${
-                      loginRole === 'admin'
-                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700'
-                        : 'bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700'
-                    }`}
+                    className="w-full text-white font-bold py-4 rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all btn-ripple bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700"
                     disabled={loading}
                   >
                     {loading ? (
@@ -363,22 +308,19 @@ export const LoginPage: React.FC = () => {
                         <span className="spinner border-2 border-white border-t-transparent rounded-full w-5 h-5"></span>
                         Signing in...
                       </span>
-                    ) : loginRole === 'admin' ? (
-                      'Sign In as Administrator →'
                     ) : (
-                      'Sign In as Restaurant Owner →'
+                      'Sign In to Restaurant Portal →'
                     )}
                   </Button>
                 </motion.div>
 
                 {/* Google Authentication for Restaurant Owners */}
-                {loginRole === 'owner' && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.95 }}
-                    className="pt-2"
-                  >
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.95 }}
+                  className="pt-2"
+                >
                     <div className="relative my-4">
                       <div className="absolute inset-0 flex items-center">
                         <div className="w-full border-t border-slate-200"></div>
@@ -402,7 +344,6 @@ export const LoginPage: React.FC = () => {
                       Sign in with Google
                     </button>
                   </motion.div>
-                )}
               </form>
 
               <motion.p
@@ -416,6 +357,16 @@ export const LoginPage: React.FC = () => {
                   Create account →
                 </Link>
               </motion.p>
+
+              <div className="mt-5 pt-4 border-t border-slate-200/80 text-center">
+                <Link
+                  to="/admin/login"
+                  className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-purple-600 font-medium transition-colors group"
+                >
+                  <Shield size={13} className="text-purple-500 group-hover:scale-110 transition-transform" />
+                  <span>SellSense Staff / Super Admin? <strong>Access Admin Portal &rarr;</strong></span>
+                </Link>
+              </div>
             </div>
           </motion.div>
         </div>

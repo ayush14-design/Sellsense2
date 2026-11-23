@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { authStorage } from '../utils/auth';
-import { demoRestaurant } from '../data/sampleData';
-import { Check, Loader2, Moon, Sun, Globe, Bell, Bot, ArrowLeft, Save, Building, ShieldCheck, Sparkles, Upload, FileSpreadsheet, FileText, X } from 'lucide-react';
-import type { BusinessType, Platform } from '../types';
+import { backendApi } from '../services/backendApi';
+import {
+  Check, Loader2, Moon, Sun, Globe, Bell, Bot, ArrowLeft, Save,
+  Building, ShieldCheck, Sparkles, Upload, FileSpreadsheet, FileText,
+  X, MapPin, Mail, User, Download, Info, CheckCircle, ArrowRight
+} from 'lucide-react';
+import type { BusinessType, Platform, Restaurant } from '../types';
 import { zomatoApi } from '../services/zomatoApi';
 import {
   isDarkMode,
@@ -42,16 +46,17 @@ export const SetupPage: React.FC<SetupPageProps> = ({ mode }) => {
 
   // Existing / current restaurant details
   const existingRestaurant = authStorage.getRestaurant();
+  const currentUser = authStorage.getUser();
 
   // Step 1: Business Details
   const [businessDetails, setBusinessDetails] = useState({
-    restaurantName: existingRestaurant?.name || 'Nelam Restaurants',
-    ownerName: existingRestaurant?.ownerName || 'Demo Owner',
+    restaurantName: existingRestaurant?.name || (currentUser?.fullName ? `${currentUser.fullName}'s Restaurant` : 'My Restaurant'),
+    ownerName: existingRestaurant?.ownerName || currentUser?.fullName || 'Owner',
     businessType: (existingRestaurant?.businessType || 'Restaurant') as BusinessType,
     city: existingRestaurant?.city || 'Pune',
-    location: existingRestaurant?.location || 'Koregaon Park, Pune',
-    contactEmail: existingRestaurant?.contactEmail || 'owner@nelamrestaurants.com',
-    description: existingRestaurant?.description || 'Fine dining with traditional Indian flavors',
+    location: existingRestaurant?.location || 'Main Location',
+    contactEmail: existingRestaurant?.contactEmail || currentUser?.email || '',
+    description: existingRestaurant?.description || 'Authentic dining experience',
   });
 
   // Step 2: Platform Connections (Google REMOVED per requirement 1: Only Zomato & Swiggy)
@@ -97,12 +102,6 @@ export const SetupPage: React.FC<SetupPageProps> = ({ mode }) => {
   }, []);
 
   useEffect(() => {
-    const user = authStorage.getUser();
-    if (user?.role === 'super_admin' || user?.role === 'admin' || user?.email === 'admin@sellsense.ai') {
-      navigate('/admin', { replace: true });
-      return;
-    }
-
     const connected = zomatoApi.isConnected();
     if (connected) {
       setConnections(prev => ({ ...prev, Zomato: 'Connected' }));
@@ -135,31 +134,67 @@ export const SetupPage: React.FC<SetupPageProps> = ({ mode }) => {
     setStep(3);
   };
 
+  const downloadSampleTemplate = () => {
+    const csvContent = "data:text/csv;charset=utf-8," + 
+      "Date,Reviewer,Rating,Review Text,Dish\n" +
+      "2026-03-01,Amit Sharma,5,The paneer was exceptionally fresh and rich in taste.,Paneer Butter Masala\n" +
+      "2026-03-02,Priya Patel,2,Biryani arrived cold and the packaging box was crushed.,Chicken Dum Biryani\n" +
+      "2026-03-03,Rahul Verma,4,Great spices and authentic taste. Delivery was quick.,Butter Chicken\n";
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "sellsense_review_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleFinish = () => {
-    // Save restaurant to local storage
-    const restaurant = {
-      ...demoRestaurant,
-      name: businessDetails.restaurantName,
-      ownerName: businessDetails.ownerName,
+    // Save restaurant to local storage and backend
+    const user = authStorage.getUser();
+    const existingRest = authStorage.getRestaurant();
+    const restId = (user && user.id !== 'user_demo_001')
+      ? (existingRest && existingRest.id !== 'restaurant_nelam_001' ? existingRest.id : `rest_${user.id}`)
+      : (existingRest?.id || `rest_${Date.now()}`);
+
+    const finalOwnerId = user?.id || 'owner_default';
+    const restaurant: Restaurant = {
+      id: restId,
+      name: businessDetails.restaurantName || (user?.fullName ? `${user.fullName}'s Restaurant` : 'My Restaurant'),
+      ownerName: businessDetails.ownerName || user?.fullName || 'Owner',
       businessType: businessDetails.businessType,
       city: businessDetails.city,
       location: businessDetails.location,
-      contactEmail: businessDetails.contactEmail,
-      description: businessDetails.description,
+      contactEmail: businessDetails.contactEmail || user?.email || '',
+      description: businessDetails.description || 'Configured via SellSense Onboarding Wizard',
       reviewSources: Object.entries(connections)
         .filter(([_, status]) => status !== 'Not Connected')
         .map(([platform]) => platform as Platform),
+      dataMode: 'LIVE',
+      ownerId: finalOwnerId,
+      isActive: true,
+      createdAt: new Date().toISOString(),
     };
 
+    if (user?.id) {
+      localStorage.setItem(`sellsense_setup_done_${user.id}`, 'true');
+    }
     authStorage.setRestaurant(restaurant);
+    backendApi.updateRestaurantDetails(restaurant).catch((err: any) => console.warn('Sync restaurant error:', err));
     navigate('/products');
   };
 
   // Handler for Saving from Settings section
   const handleSaveSettings = () => {
-    const currentRest = authStorage.getRestaurant() || demoRestaurant;
-    const updated = {
-      ...currentRest,
+    const user = authStorage.getUser();
+    const currentRest = authStorage.getRestaurant();
+    const restId = (user && user.id !== 'user_demo_001')
+      ? (currentRest && currentRest.id !== 'restaurant_nelam_001' ? currentRest.id : `rest_${user.id}`)
+      : (currentRest?.id || `rest_${Date.now()}`);
+
+    const finalOwnerId = user?.id || currentRest?.ownerId || 'owner_default';
+    const updated: Restaurant = {
+      id: restId,
       name: businessDetails.restaurantName,
       ownerName: businessDetails.ownerName,
       businessType: businessDetails.businessType,
@@ -170,9 +205,14 @@ export const SetupPage: React.FC<SetupPageProps> = ({ mode }) => {
       reviewSources: Object.entries(connections)
         .filter(([_, status]) => status !== 'Not Connected')
         .map(([platform]) => platform as Platform),
+      dataMode: 'LIVE',
+      ownerId: finalOwnerId,
+      isActive: true,
+      createdAt: currentRest?.createdAt || new Date().toISOString(),
     };
 
     authStorage.setRestaurant(updated);
+    backendApi.updateRestaurantDetails(updated).catch((err: any) => console.warn('Sync restaurant error:', err));
     setTheme(darkModeActive);
     setLanguage(selectedLang);
     setAlertSettings(alertSettings);
@@ -867,295 +907,477 @@ export const SetupPage: React.FC<SetupPageProps> = ({ mode }) => {
   }
 
   // =========================================================================
-  // VIEW B: ONBOARDING SETUP MODE (Only 3 steps, NO additional options shown)
-  // Google option removed from Review Sources per Requirement 1
+  // VIEW B: ONBOARDING SETUP MODE (Only 3 steps, modern, sleek & tenant-isolated)
+  // Step 1: Restaurant Profile -> Step 2: Upload Reviews Sheet -> Step 3: Launch
   // =========================================================================
   return (
-    <div className="min-h-screen bg-warm-stone py-12 px-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-slate-950 text-slate-100 py-12 px-4 sm:px-6 relative overflow-hidden flex flex-col justify-center">
+      {/* Background Glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-lime-500/10 rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-96 h-96 bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
+
+      <div className="max-w-3xl mx-auto w-full relative z-10">
+        {/* Onboarding Header */}
         <div className="text-center mb-8">
-          <h1 className="font-serif text-4xl font-bold text-deep-charcoal mb-2">
-            Setup Your Restaurant
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-lime-400/10 border border-lime-400/20 text-lime-400 text-xs font-black uppercase tracking-wider mb-3">
+            <Sparkles size={14} />
+            <span>Welcome to SellSense • 3-Step Guided Setup</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">
+            Setup Your Restaurant & Review Hub
           </h1>
-          <p className="text-muted-gray">Complete the setup to start analyzing reviews</p>
+          <p className="text-slate-400 text-sm max-w-lg mx-auto">
+            Configure your business profile and connect review sources to unlock AI sentiment insights in under 2 minutes.
+          </p>
         </div>
 
-        {/* Progress Indicator */}
-        <div className="flex items-center justify-center mb-12">
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                step >= 1 ? 'bg-deep-charcoal text-white' : 'bg-light-beige text-muted-gray'
-              }`}
-            >
-              1
+        {/* 3-Step Wizard Indicator */}
+        <div className="flex items-center justify-center mb-8 px-4">
+          <div className="flex items-center gap-3 w-full max-w-md justify-between">
+            {/* Step 1 Pill */}
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm transition-all ${
+                  step === 1
+                    ? 'bg-lime-400 text-slate-950 shadow-lg shadow-lime-400/25 ring-2 ring-lime-400/40'
+                    : step > 1
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-slate-800 text-slate-500 border border-slate-700'
+                }`}
+              >
+                {step > 1 ? <Check size={18} /> : '1'}
+              </div>
+              <span className={`text-xs font-bold hidden sm:inline ${step >= 1 ? 'text-white' : 'text-slate-500'}`}>
+                Profile
+              </span>
             </div>
-            <div className={`w-20 h-1 ${step >= 2 ? 'bg-deep-charcoal' : 'bg-light-beige'}`} />
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                step >= 2 ? 'bg-deep-charcoal text-white' : 'bg-light-beige text-muted-gray'
-              }`}
-            >
-              2
+
+            <div className={`flex-1 h-1 mx-2 rounded-full transition-all ${step >= 2 ? 'bg-emerald-500' : 'bg-slate-800'}`} />
+
+            {/* Step 2 Pill */}
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm transition-all ${
+                  step === 2
+                    ? 'bg-lime-400 text-slate-950 shadow-lg shadow-lime-400/25 ring-2 ring-lime-400/40'
+                    : step > 2
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-slate-800 text-slate-500 border border-slate-700'
+                }`}
+              >
+                {step > 2 ? <Check size={18} /> : '2'}
+              </div>
+              <span className={`text-xs font-bold hidden sm:inline ${step >= 2 ? 'text-white' : 'text-slate-500'}`}>
+                Reviews
+              </span>
             </div>
-            <div className={`w-20 h-1 ${step >= 3 ? 'bg-deep-charcoal' : 'bg-light-beige'}`} />
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                step >= 3 ? 'bg-deep-charcoal text-white' : 'bg-light-beige text-muted-gray'
-              }`}
-            >
-              3
+
+            <div className={`flex-1 h-1 mx-2 rounded-full transition-all ${step >= 3 ? 'bg-emerald-500' : 'bg-slate-800'}`} />
+
+            {/* Step 3 Pill */}
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm transition-all ${
+                  step === 3
+                    ? 'bg-lime-400 text-slate-950 shadow-lg shadow-lime-400/25 ring-2 ring-lime-400/40'
+                    : 'bg-slate-800 text-slate-500 border border-slate-700'
+                }`}
+              >
+                3
+              </div>
+              <span className={`text-xs font-bold hidden sm:inline ${step === 3 ? 'text-white' : 'text-slate-500'}`}>
+                Launch
+              </span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8 border border-border-beige">
-          {/* Step 1: Business Details */}
+        {/* Step Card Container */}
+        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+          {/* STEP 1: RESTAURANT PROFILE DETAILS */}
           {step === 1 && (
-            <div>
-              <h2 className="text-2xl font-bold text-deep-charcoal mb-6">Business Details</h2>
-              <div className="space-y-5">
+            <div className="space-y-6">
+              <div className="border-b border-slate-800 pb-4">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Building className="text-lime-400" size={20} />
+                  Step 1: Restaurant Profile Details
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Tell us about your restaurant to personalize your dashboard and kitchen reports.
+                </p>
+              </div>
+
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-deep-charcoal mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
                     Restaurant / Business Name *
                   </label>
-                  <input
-                    name="restaurantName"
-                    type="text"
-                    value={businessDetails.restaurantName}
-                    onChange={handleBusinessDetailsChange}
-                    className="w-full px-4 py-3 border border-border-beige rounded-lg focus:outline-none focus:ring-2 focus:ring-deep-charcoal"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-deep-charcoal mb-2">
-                    Owner Name *
-                  </label>
-                  <input
-                    name="ownerName"
-                    type="text"
-                    value={businessDetails.ownerName}
-                    onChange={handleBusinessDetailsChange}
-                    className="w-full px-4 py-3 border border-border-beige rounded-lg focus:outline-none focus:ring-2 focus:ring-deep-charcoal"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-deep-charcoal mb-2">
-                    Business Type *
-                  </label>
-                  <select
-                    name="businessType"
-                    value={businessDetails.businessType}
-                    onChange={handleBusinessDetailsChange}
-                    className="w-full px-4 py-3 border border-border-beige rounded-lg focus:outline-none focus:ring-2 focus:ring-deep-charcoal"
-                    required
-                  >
-                    <option value="Restaurant">Restaurant</option>
-                    <option value="Café">Café</option>
-                    <option value="Food Stall">Food Stall</option>
-                    <option value="Street Food Vendor">Street Food Vendor</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-deep-charcoal mb-2">
-                      City *
-                    </label>
+                  <div className="relative">
+                    <Building className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
-                      name="city"
+                      name="restaurantName"
                       type="text"
-                      value={businessDetails.city}
+                      value={businessDetails.restaurantName}
                       onChange={handleBusinessDetailsChange}
-                      className="w-full px-4 py-3 border border-border-beige rounded-lg focus:outline-none focus:ring-2 focus:ring-deep-charcoal"
+                      placeholder="e.g. Royal Spice Biryani House"
+                      className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 font-medium"
                       required
                     />
                   </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                      Owner / Manager Name *
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        name="ownerName"
+                        type="text"
+                        value={businessDetails.ownerName}
+                        onChange={handleBusinessDetailsChange}
+                        placeholder="e.g. Ayush Mandalkar"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 font-medium"
+                        required
+                      />
+                    </div>
+                  </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-deep-charcoal mb-2">
-                      Location *
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                      Business Type *
+                    </label>
+                    <select
+                      name="businessType"
+                      value={businessDetails.businessType}
+                      onChange={handleBusinessDetailsChange}
+                      className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 font-medium cursor-pointer"
+                      required
+                    >
+                      <option value="Restaurant">Full-Service Restaurant</option>
+                      <option value="Café">Café & Coffee Shop</option>
+                      <option value="Cloud Kitchen">Cloud Kitchen / Delivery Only</option>
+                      <option value="QSR">QSR / Fast Food</option>
+                      <option value="Bakery">Bakery & Desserts</option>
+                      <option value="Food Stall">Food Stall / Food Truck</option>
+                      <option value="Other">Other Dining Format</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                      City *
+                    </label>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        name="city"
+                        type="text"
+                        value={businessDetails.city}
+                        onChange={handleBusinessDetailsChange}
+                        placeholder="e.g. Pune, Mumbai, Bengaluru"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 font-medium"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                      Branch / Outlet Area
                     </label>
                     <input
                       name="location"
                       type="text"
                       value={businessDetails.location}
                       onChange={handleBusinessDetailsChange}
-                      className="w-full px-4 py-3 border border-border-beige rounded-lg focus:outline-none focus:ring-2 focus:ring-deep-charcoal"
+                      placeholder="e.g. Koregaon Park, Indiranagar"
+                      className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                    Contact Email *
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      name="contactEmail"
+                      type="email"
+                      value={businessDetails.contactEmail}
+                      onChange={handleBusinessDetailsChange}
+                      placeholder="contact@myrestaurant.com"
+                      className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 font-medium"
                       required
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-deep-charcoal mb-2">
-                    Contact Email *
-                  </label>
-                  <input
-                    name="contactEmail"
-                    type="email"
-                    value={businessDetails.contactEmail}
-                    onChange={handleBusinessDetailsChange}
-                    className="w-full px-4 py-3 border border-border-beige rounded-lg focus:outline-none focus:ring-2 focus:ring-deep-charcoal"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-deep-charcoal mb-2">
-                    Description (Optional)
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                    Cuisine / Short Description (Optional)
                   </label>
                   <textarea
                     name="description"
                     value={businessDetails.description}
                     onChange={handleBusinessDetailsChange}
-                    className="w-full px-4 py-3 border border-border-beige rounded-lg focus:outline-none focus:ring-2 focus:ring-deep-charcoal"
-                    rows={3}
+                    placeholder="e.g. Authentic North Indian, Biryanis and Mughlai curries crafted with traditional recipes"
+                    className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 font-medium"
+                    rows={2}
                   />
                 </div>
+              </div>
 
-                <div className="flex justify-end">
-                  <Button onClick={handleStep1Next}>Continue</Button>
-                </div>
+              <div className="flex justify-end pt-4 border-t border-slate-800">
+                <Button
+                  onClick={handleStep1Next}
+                  className="bg-lime-400 hover:bg-lime-500 text-slate-950 font-black px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm"
+                >
+                  <span>Next: Connect Review Sources</span>
+                  <ArrowRight size={16} />
+                </Button>
               </div>
             </div>
           )}
 
-          {/* Step 2: Platform Connections (Google REMOVED - Only Zomato & Swiggy) */}
+          {/* STEP 2: REVIEW SOURCES & SPREADSHEET UPLOAD */}
           {step === 2 && (
-            <div>
-              <h2 className="text-2xl font-bold text-deep-charcoal mb-2 flex items-center gap-2">
-                <FileSpreadsheet size={24} className="text-lime-600" />
-                Upload Review Sources
-              </h2>
-              <p className="text-muted-gray mb-6">
-                Upload your customer reviews as spreadsheets (CSV or XLSX) — no API keys required
-              </p>
+            <div className="space-y-6">
+              <div className="border-b border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <FileSpreadsheet className="text-lime-400" size={20} />
+                    Step 2: Connect Review Sources (Spreadsheet / CSV)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Upload customer reviews from Zomato or Swiggy. No complex API keys needed.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={downloadSampleTemplate}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-lime-400 hover:text-lime-300 bg-lime-400/10 hover:bg-lime-400/20 px-3 py-1.5 rounded-xl border border-lime-400/30 transition self-start sm:self-auto"
+                >
+                  <Download size={14} />
+                  <span>Download Sample CSV</span>
+                </button>
+              </div>
 
               <div className="space-y-4">
-                {spreadsheetSources.map((source) => {
-                  const status = uploadStatus[source.id as 'zomato' | 'swiggy' | 'google'];
-                  const file = uploadedFiles[source.id as 'zomato' | 'swiggy' | 'google'];
+                {spreadsheetSources.filter(s => s.id !== 'google').map((source) => {
+                  const status = uploadStatus[source.id as 'zomato' | 'swiggy'];
+                  const file = uploadedFiles[source.id as 'zomato' | 'swiggy'];
+
                   return (
-                    <div key={source.id} className="border border-border-beige rounded-xl p-5">
+                    <div
+                      key={source.id}
+                      className="border border-slate-800 rounded-2xl p-5 bg-slate-950/60 hover:border-slate-700 transition"
+                    >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          <div className="text-3xl p-2 bg-gray-50 rounded-xl border border-gray-100">{source.icon}</div>
+                          <div className="text-3xl p-3 bg-slate-900 rounded-2xl border border-slate-800">
+                            {source.icon}
+                          </div>
                           <div>
-                            <h3 className="font-bold text-deep-charcoal">{source.name}</h3>
-                            <p className="text-sm text-muted-gray">{source.description}</p>
-                            <p className="text-xs text-muted-gray mt-0.5 italic">{source.instructions}</p>
-                            {status === 'success' && (
-                              <span className="inline-block mt-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-700">
-                                ✓ Uploaded
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-white text-base">{source.name}</h3>
+                              {status === 'success' && (
+                                <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
+                                  ✓ Connected & Uploaded
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">{source.description}</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5 italic">{source.instructions}</p>
                           </div>
                         </div>
-                        <div className="flex-shrink-0">
+
+                        <div className="flex items-center gap-3 self-end sm:self-center">
                           {status === 'success' && file ? (
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
-                                <FileText size={14} className="text-green-600" />
-                                <span className="text-xs font-medium text-green-800 max-w-[120px] truncate">{file.name}</span>
-                              </div>
-                              <button onClick={() => handleFileRemove(source.id as 'zomato' | 'swiggy' | 'google')} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
+                            <div className="flex items-center gap-2 bg-emerald-950/60 border border-emerald-800 rounded-xl px-3 py-2">
+                              <FileText size={16} className="text-emerald-400" />
+                              <span className="text-xs font-semibold text-emerald-200 max-w-[130px] truncate">
+                                {file.name}
+                              </span>
+                              <button
+                                onClick={() => handleFileRemove(source.id as 'zomato' | 'swiggy')}
+                                className="p-1 text-slate-400 hover:text-red-400 transition"
+                                title="Remove file"
+                              >
                                 <X size={14} />
                               </button>
                             </div>
                           ) : status === 'uploading' ? (
-                            <div className="flex items-center gap-2 text-sm text-lime-600">
+                            <div className="flex items-center gap-2 text-xs font-bold text-lime-400 bg-lime-400/10 px-4 py-2.5 rounded-xl border border-lime-400/20">
                               <Loader2 size={16} className="animate-spin" />
-                              Processing...
+                              Parsing reviews...
                             </div>
                           ) : (
-                            <label className="flex items-center gap-2 cursor-pointer bg-lime-400 hover:bg-lime-500 text-slate-950 font-black rounded-lg px-4 py-2 transition-colors text-sm">
+                            <label className="flex items-center gap-2 cursor-pointer bg-lime-400 hover:bg-lime-500 text-slate-950 font-black rounded-xl px-4 py-2.5 transition text-xs shadow-md">
                               <Upload size={14} />
-                              Upload File
-                              <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(source.id as 'zomato' | 'swiggy' | 'google', f); }} />
+                              <span>Upload Reviews</span>
+                              <input
+                                type="file"
+                                accept=".csv,.xlsx,.xls"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) handleFileUpload(source.id as 'zomato' | 'swiggy', f);
+                                }}
+                              />
                             </label>
                           )}
                         </div>
                       </div>
-                      <div className="mt-2 pt-2 border-t border-gray-100">
-                        <p className="text-xs text-muted-gray"><span className="font-medium text-deep-charcoal">Columns:</span> {source.template}</p>
+
+                      <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500">
+                        <span>Expected columns: <code className="text-slate-400">{source.template}</code></span>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-4">
-                <p className="text-sm text-amber-800 font-medium">You can skip this step and upload spreadsheets later from Settings.</p>
+              <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl flex items-start gap-3 text-xs text-slate-400">
+                <Info size={18} className="text-lime-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold text-slate-200 block mb-0.5">Don't have your spreadsheet ready right now?</span>
+                  No problem! You can proceed now and upload your customer review sheets anytime from the dishes or analytics page.
+                </div>
               </div>
 
-              <div className="flex justify-between mt-8">
-                <Button variant="outline" onClick={() => setStep(1)}>
+              <div className="flex justify-between pt-4 border-t border-slate-800">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(1)}
+                  className="border-slate-700 text-slate-300 hover:bg-slate-800 text-sm"
+                >
                   Back
                 </Button>
-                <Button onClick={handleStep2Next}>Continue</Button>
+                <Button
+                  onClick={handleStep2Next}
+                  className="bg-lime-400 hover:bg-lime-500 text-slate-950 font-black px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm"
+                >
+                  <span>Continue to Launch</span>
+                  <ArrowRight size={16} />
+                </Button>
               </div>
             </div>
           )}
 
-          {/* Step 3: Review Configuration */}
+          {/* STEP 3: REVIEW CONFIGURATION & LAUNCH */}
           {step === 3 && (
-            <div>
-              <h2 className="text-2xl font-bold text-deep-charcoal mb-6">
-                Review Source Configuration
-              </h2>
-              <p className="text-muted-gray mb-6">
-                Your connected platforms are ready to sync reviews
-              </p>
+            <div className="space-y-6">
+              <div className="border-b border-slate-800 pb-4">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <ShieldCheck className="text-lime-400" size={22} />
+                  Step 3: Review Configuration & Launch
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Everything is set! Confirm your details below to launch your SellSense workspace.
+                </p>
+              </div>
 
-              <div className="space-y-4 mb-8">
+              {/* Profile Summary Card */}
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Restaurant Profile</span>
+                  <button
+                    onClick={() => setStep(1)}
+                    className="text-xs font-bold text-lime-400 hover:underline"
+                  >
+                    Edit Profile
+                  </button>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-slate-500 block">Restaurant Name:</span>
+                    <span className="text-white font-bold text-sm">{businessDetails.restaurantName}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Owner / Lead:</span>
+                    <span className="text-white font-bold text-sm">{businessDetails.ownerName}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Business Format:</span>
+                    <span className="text-white font-semibold">{businessDetails.businessType}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Location:</span>
+                    <span className="text-white font-semibold">{businessDetails.location}, {businessDetails.city}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Data Sources Status */}
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Review Sources</span>
+                  <button
+                    onClick={() => setStep(2)}
+                    className="text-xs font-bold text-lime-400 hover:underline"
+                  >
+                    Manage Sources
+                  </button>
+                </div>
+
                 {Object.entries(uploadedFiles).some(([_, f]) => f !== null) ? (
-                  Object.entries(uploadedFiles)
-                    .filter(([_, f]) => f !== null)
-                    .map(([source, file]) => (
-                      <div
-                        key={source}
-                        className="border border-green-200 rounded-xl p-5 bg-green-50 flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Check className="text-green-600" size={22} />
-                          <div>
-                            <h3 className="font-bold text-deep-charcoal capitalize">{source} Reviews Spreadsheet</h3>
-                            <p className="text-xs text-green-800 font-medium mt-0.5">
-                              File: {file?.name} • Ready for analysis
-                            </p>
+                  <div className="space-y-2">
+                    {Object.entries(uploadedFiles)
+                      .filter(([_, f]) => f !== null)
+                      .map(([source, file]) => (
+                        <div
+                          key={source}
+                          className="flex items-center justify-between p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/80 text-xs"
+                        >
+                          <div className="flex items-center gap-2 text-emerald-300 font-bold capitalize">
+                            <CheckCircle size={16} className="text-emerald-400" />
+                            <span>{source} Reviews Sheet ({file?.name})</span>
                           </div>
+                          <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full">
+                            Ready
+                          </span>
                         </div>
-                        <span className="text-xs font-bold text-green-700 bg-green-100 px-3 py-1 rounded-full">Uploaded</span>
-                      </div>
-                    ))
+                      ))}
+                  </div>
                 ) : (
-                  <div className="border border-dashed border-gray-300 rounded-xl p-6 text-center bg-gray-50">
-                    <p className="text-sm font-semibold text-deep-charcoal">Nelam Restaurants Demo Reviews Active</p>
-                    <p className="text-xs text-muted-gray mt-1">
-                      No custom spreadsheet uploaded. Standard demo dataset will be loaded so you can explore analytics immediately. You can upload spreadsheets anytime from Settings.
-                    </p>
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400">
+                    <span className="font-bold text-slate-300 block mb-0.5">Clean Tenant Workspace Ready</span>
+                    You can upload your reviews spreadsheet anytime directly from the dishes page with 1 click.
                   </div>
                 )}
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
-                <p className="text-sm text-blue-900">
-                  <strong>Demo Mode:</strong> You're using sample data from Nelam Restaurants. This
-                  is for demonstration purposes only.
-                </p>
+              {/* Privacy Notice */}
+              <div className="p-4 bg-emerald-950/30 border border-emerald-800/60 rounded-2xl flex items-center gap-3 text-xs text-emerald-300">
+                <ShieldCheck size={20} className="text-emerald-400 flex-shrink-0" />
+                <span>
+                  <strong>Tenant Data Isolation Guaranteed:</strong> Your restaurant reviews and menu data are strictly private and isolated to your account.
+                </span>
               </div>
 
-              <div className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(2)}>
+              <div className="flex justify-between pt-4 border-t border-slate-800">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(2)}
+                  className="border-slate-700 text-slate-300 hover:bg-slate-800 text-sm"
+                >
                   Back
                 </Button>
-                <Button onClick={handleFinish}>Continue to Dashboard</Button>
+                <Button
+                  onClick={handleFinish}
+                  className="bg-lime-400 hover:bg-lime-500 text-slate-950 font-black px-8 py-3 rounded-xl shadow-xl flex items-center gap-2 text-sm"
+                >
+                  <span>🚀 Launch SellSense Dashboard</span>
+                </Button>
               </div>
             </div>
           )}

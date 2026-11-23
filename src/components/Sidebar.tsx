@@ -12,7 +12,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ restaurantName }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const currentUser = authStorage.getUser();
-  const isAdmin = currentUser?.role === 'super_admin' || currentUser?.role === 'admin' || currentUser?.email === 'admin@sellsense.ai';
+  const isAdmin = currentUser?.role === 'super_admin' || currentUser?.email?.toLowerCase() === 'ayushmandalkar14@gmail.com';
 
   const handleLogout = () => {
     authStorage.logout();

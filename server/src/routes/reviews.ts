@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import db from '../models/database.js';
+import { optionalAuth, AuthRequest } from '../middleware/auth.js';
 
 export const reviewsRouter = Router();
+reviewsRouter.use(optionalAuth);
 
 // Helper to determine sentiment and theme from review text & optional rating
 function analyzeReviewText(text: string, rating?: number | null): {
@@ -78,8 +80,13 @@ function analyzeReviewText(text: string, rating?: number | null): {
 }
 
 // Helper to ensure restaurant exists in database so foreign key constraints never fail
-function ensureValidRestaurant(restaurantId?: string, restaurantName?: string): string {
-  const targetId = (restaurantId && restaurantId.trim()) || 'restaurant_nelam_001';
+function ensureValidRestaurant(restaurantId?: string, restaurantName?: string, ownerId?: string): string {
+  if (!restaurantId && ownerId) {
+    const userRest = db.prepare('SELECT id FROM restaurants WHERE owner_id = ? AND is_active = 1 LIMIT 1').get(ownerId) as { id: string } | undefined;
+    if (userRest) return userRest.id;
+  }
+
+  const targetId = (restaurantId && restaurantId.trim()) || (ownerId ? `rest_${ownerId}` : 'restaurant_nelam_001');
 
   // Check if restaurant with targetId exists in restaurants table
   const existing = db.prepare('SELECT id FROM restaurants WHERE id = ?').get(targetId) as { id: string } | undefined;
@@ -87,24 +94,20 @@ function ensureValidRestaurant(restaurantId?: string, restaurantName?: string): 
     return existing.id;
   }
 
-  // Ensure fallback user exists in users table so foreign key constraint is guaranteed
+  // Ensure owner user exists
+  const finalOwnerId = ownerId || 'user_demo_001';
   try {
     db.prepare(`
       INSERT OR IGNORE INTO users (id, email, password_hash, full_name, role, is_active)
-      VALUES ('user_demo_001', 'demo@nelamrestaurants.com', '$2a$10$demo', 'Demo Restaurant Owner', 'restaurant_owner', 1)
-    `).run();
+      VALUES (?, ?, '$2a$10$demo', ?, 'restaurant_owner', 1)
+    `).run(finalOwnerId, `${finalOwnerId}@sellsense.ai`, restaurantName || 'Restaurant Owner');
   } catch (e) {}
-
-  // Find any existing owner user to link as owner_id
-  const owner = (db.prepare("SELECT id FROM users WHERE role = 'restaurant_owner' OR id = 'user_demo_001'").get() ||
-                 db.prepare("SELECT id FROM users LIMIT 1").get()) as { id: string } | undefined;
-  const ownerId = owner?.id || 'user_demo_001';
 
   try {
     db.prepare(`
       INSERT OR IGNORE INTO restaurants (id, name, owner_name, business_type, city, location, contact_email, description, owner_id)
-      VALUES (?, ?, ?, 'Restaurant', 'Pune', 'Koregaon Park, Pune', 'demo@nelamrestaurants.com', 'Restaurant profile', ?)
-    `).run(targetId, restaurantName || 'Nelam Restaurants', 'Demo Owner', ownerId);
+      VALUES (?, ?, 'Restaurant Owner', 'Restaurant', 'Pune', 'Main Location', 'owner@sellsense.ai', 'Restaurant profile', ?)
+    `).run(targetId, restaurantName || 'My Restaurant', finalOwnerId);
   } catch (e) {
     console.warn('Could not auto-insert restaurant for manual upload:', e);
   }
@@ -113,7 +116,7 @@ function ensureValidRestaurant(restaurantId?: string, restaurantName?: string): 
 }
 
 // 1. POST /api/reviews/manual-import: Import parsed reviews from spreadsheet
-reviewsRouter.post('/manual-import', (req: Request, res: Response) => {
+reviewsRouter.post('/manual-import', (req: AuthRequest, res: Response) => {
   try {
     const { restaurantId, restaurantName, filename, fileType, reviews } = req.body;
 
@@ -121,7 +124,7 @@ reviewsRouter.post('/manual-import', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'No reviews found in upload payload' });
     }
 
-    const restId = ensureValidRestaurant(restaurantId, restaurantName);
+    const restId = ensureValidRestaurant(restaurantId, restaurantName, req.user?.id);
     const batchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const fname = filename || 'uploaded_reviews.xlsx';
     const ftype = fileType || (fname.endsWith('.csv') ? 'csv' : 'xlsx');
@@ -247,10 +250,13 @@ reviewsRouter.post('/manual-import', (req: Request, res: Response) => {
 });
 
 // 2. GET /api/reviews/manual: Get imported manual reviews with stats
-reviewsRouter.get('/manual', (req: Request, res: Response) => {
+reviewsRouter.get('/manual', (req: AuthRequest, res: Response) => {
   try {
-    const rawRestId = (req.query.restaurantId as string) || 'restaurant_nelam_001';
-    const restaurantId = ensureValidRestaurant(rawRestId);
+    const rawRestId = (req.query.restaurantId as string) || (req.user ? `rest_${req.user.id}` : undefined);
+    if (!rawRestId) {
+      return res.json({ reviews: [], total: 0, page: 1, limit: 20, stats: { totalImportedReviews: 0, productsCount: 0, productNames: [], latestImportDate: null } });
+    }
+    const restaurantId = ensureValidRestaurant(rawRestId, undefined, req.user?.id);
     const productName = req.query.productName as string | undefined;
     const platform = req.query.platform as string | undefined;
     const batchId = req.query.batchId as string | undefined;
@@ -354,15 +360,15 @@ reviewsRouter.delete('/batch/:batchId', (req: Request, res: Response) => {
 });
 
 // 5. GET /api/reviews/product-analysis: AI-Powered Product Review Analysis
-reviewsRouter.get('/product-analysis', (req: Request, res: Response) => {
+reviewsRouter.get('/product-analysis', (req: AuthRequest, res: Response) => {
   try {
-    const rawRestId = (req.query.restaurantId as string) || 'restaurant_nelam_001';
-    const restaurantId = ensureValidRestaurant(rawRestId);
+    const rawRestId = (req.query.restaurantId as string) || (req.user ? `rest_${req.user.id}` : undefined);
     const productName = req.query.productName as string;
 
-    if (!productName) {
-      return res.status(400).json({ error: 'productName query parameter is required' });
+    if (!productName || !rawRestId) {
+      return res.status(400).json({ error: 'productName and restaurantId query parameters are required' });
     }
+    const restaurantId = ensureValidRestaurant(rawRestId, undefined, req.user?.id);
 
     const reviews = db.prepare(`
       SELECT * FROM manual_reviews
@@ -846,10 +852,13 @@ reviewsRouter.get('/product-analysis', (req: Request, res: Response) => {
 });
 
 // 6. GET /api/reviews/products-summary: Summary of all dishes found in manual reviews
-reviewsRouter.get('/products-summary', (req: Request, res: Response) => {
+reviewsRouter.get('/products-summary', (req: AuthRequest, res: Response) => {
   try {
-    const rawRestId = (req.query.restaurantId as string) || 'restaurant_nelam_001';
-    const restaurantId = ensureValidRestaurant(rawRestId);
+    const rawRestId = (req.query.restaurantId as string) || (req.user ? `rest_${req.user.id}` : undefined);
+    if (!rawRestId) {
+      return res.json({ products: [], total: 0 });
+    }
+    const restaurantId = ensureValidRestaurant(rawRestId, undefined, req.user?.id);
 
     const rows = db.prepare(`
       SELECT 
