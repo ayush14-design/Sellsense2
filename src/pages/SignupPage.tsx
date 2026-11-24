@@ -102,7 +102,9 @@ export const SignupPage: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      // Send real Google credential to backend
+      // Clear any prior local session to ensure total tenant isolation
+      authStorage.logout();
+
       const res = await backendApi.googleAuth({
         credential: data.credential,
         email: data.email,
@@ -114,16 +116,29 @@ export const SignupPage: React.FC = () => {
       authStorage.setUser(user);
       localStorage.setItem('auth_token', token);
 
-      if (restaurant) {
-        authStorage.setRestaurant(restaurant);
-      }
+      const targetRestaurant = restaurant || {
+        id: `rest_${user.id}`,
+        name: user.fullName ? `${user.fullName}'s Restaurant` : 'My Restaurant',
+        ownerName: user.fullName || 'Owner',
+        businessType: 'Restaurant',
+        city: 'Pune',
+        location: 'Main Location',
+        contactEmail: user.email,
+        description: 'Restaurant Profile',
+        reviewSources: ['Zomato', 'Spreadsheet'],
+        dataMode: 'LIVE',
+        ownerId: user.id,
+        isActive: true,
+      };
+
+      authStorage.setRestaurant(targetRestaurant);
 
       setGoogleModalOpen(false);
       // New Google signups are guided through the 3-step setup onboarding wizard
       localStorage.setItem(`sellsense_setup_done_${user.id}`, 'false');
       navigate('/setup');
     } catch (err: any) {
-      setError(err?.message || 'Google signup failed. Please ensure the backend server is running.');
+      setError(err?.message || 'Google signup failed. Please try again.');
     } finally {
       setLoading(false);
     }

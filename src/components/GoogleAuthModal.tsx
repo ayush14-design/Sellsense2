@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X, Lock, RefreshCw, AlertCircle, ArrowRight, UserCheck, Mail } from 'lucide-react';
 import { Button } from './Button';
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_ID =
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  '507292833466-43rjq7co7s3rd57fp7l0c5jtnurf3giu.apps.googleusercontent.com';
 
 interface GoogleAuthModalProps {
   isOpen: boolean;

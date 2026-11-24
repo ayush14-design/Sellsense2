@@ -22,7 +22,10 @@ export const LoginPage: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      // Send the real Google credential to backend for verification
+      // Clear any prior local session to ensure total tenant isolation
+      authStorage.logout();
+
+      // Send the Google credential / info to backend (with automatic client fallback)
       const res = await backendApi.googleAuth({
         credential: data.credential,
         email: data.email,
@@ -34,20 +37,33 @@ export const LoginPage: React.FC = () => {
       authStorage.setUser(user);
       localStorage.setItem('auth_token', token);
 
-      if (restaurant) {
-        authStorage.setRestaurant(restaurant);
-      }
+      const targetRestaurant = restaurant || {
+        id: `rest_${user.id}`,
+        name: user.fullName ? `${user.fullName}'s Restaurant` : 'My Restaurant',
+        ownerName: user.fullName || 'Owner',
+        businessType: 'Restaurant',
+        city: 'Pune',
+        location: 'Main Location',
+        contactEmail: user.email,
+        description: 'Restaurant Profile',
+        reviewSources: ['Zomato', 'Spreadsheet'],
+        dataMode: 'LIVE',
+        ownerId: user.id,
+        isActive: true,
+      };
+
+      authStorage.setRestaurant(targetRestaurant);
 
       setGoogleModalOpen(false);
 
       const isSetupDone = localStorage.getItem(`sellsense_setup_done_${user.id}`) === 'true';
-      if (!isSetupDone && (!restaurant?.description || restaurant?.description.toLowerCase() === 'restaurant profile')) {
+      if (!isSetupDone && (!targetRestaurant?.description || targetRestaurant?.description.toLowerCase() === 'restaurant profile')) {
         navigate('/setup');
       } else {
         navigate('/products');
       }
     } catch (err: any) {
-      setError(err?.message || 'Google authentication failed. Please ensure the backend server is running.');
+      setError(err?.message || 'Google authentication failed. Please try again.');
     } finally {
       setLoading(false);
     }

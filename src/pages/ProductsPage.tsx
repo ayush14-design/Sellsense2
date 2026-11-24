@@ -43,19 +43,16 @@ export const ProductsPage: React.FC = () => {
     latestImportDate: null,
   });
 
-  const activeRestaurant = (restaurant && restaurant.id !== 'restaurant_nelam_001')
-    ? restaurant
-    : (user && user.id !== 'user_demo_001'
-        ? {
-            id: `rest_${user.id}`,
-            name: user.fullName ? `${user.fullName}'s Restaurant` : 'My Restaurant',
+  const isDemoSession = user?.id === 'user_demo_001' || user?.email === 'demo@nelamrestaurants.com';
+  const activeRestaurant = isDemoSession
+    ? (restaurant || { id: 'restaurant_nelam_001', name: 'Nelam Restaurants', location: 'Pune' })
+    : ((restaurant && restaurant.id !== 'restaurant_nelam_001')
+        ? restaurant
+        : {
+            id: user ? `rest_${user.id}` : 'rest_guest',
+            name: user?.fullName ? `${user.fullName}'s Restaurant` : 'My Restaurant',
             location: 'Main Location',
-          }
-        : (restaurant || {
-            id: 'restaurant_nelam_001',
-            name: 'Nelam Restaurants',
-            location: 'Main Location',
-          }));
+          });
 
   useEffect(() => {
     if (searchParams.get('action') === 'upload') {

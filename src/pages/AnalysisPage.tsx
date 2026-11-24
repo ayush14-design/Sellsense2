@@ -275,19 +275,16 @@ export const AnalysisPage: React.FC = () => {
   const restaurant = authStorage.getRestaurant();
   const user = authStorage.getUser();
 
-  const activeRestaurant = (restaurant && restaurant.id !== 'restaurant_nelam_001')
-    ? restaurant
-    : (user && user.id !== 'user_demo_001'
-        ? {
-            id: `rest_${user.id}`,
-            name: user.fullName ? `${user.fullName}'s Restaurant` : 'My Restaurant',
+  const isDemoSession = user?.id === 'user_demo_001' || user?.email === 'demo@nelamrestaurants.com';
+  const activeRestaurant = isDemoSession
+    ? (restaurant || { id: 'restaurant_nelam_001', name: 'Nelam Restaurants', location: 'Pune' })
+    : ((restaurant && restaurant.id !== 'restaurant_nelam_001')
+        ? restaurant
+        : {
+            id: user ? `rest_${user.id}` : 'rest_guest',
+            name: user?.fullName ? `${user.fullName}'s Restaurant` : 'My Restaurant',
             location: 'Main Location',
-          }
-        : (restaurant || {
-            id: 'restaurant_nelam_001',
-            name: 'Nelam Restaurants',
-            location: 'Main Location',
-          }));
+          });
 
   // Products and selection
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -433,31 +430,65 @@ export const AnalysisPage: React.FC = () => {
         if (analysisRes) {
           setAnalysisData(analysisRes);
         } else {
-          // Construct analytical metrics from reviews
+          // Construct analytical metrics strictly from actual uploaded reviews
           const pos = rawReviews.filter((r: any) => r.sentiment === 'positive').length;
           const neg = rawReviews.filter((r: any) => r.sentiment === 'negative').length;
           const neu = rawReviews.length - pos - neg;
-          const total = rawReviews.length || activeProduct.totalReviews || 1;
+          const total = rawReviews.length;
 
-          setAnalysisData({
-            productName: activeProduct.name,
-            totalReviews: total,
-            positiveCount: pos || activeProduct.positiveCount || 0,
-            negativeCount: neg || activeProduct.negativeCount || 0,
-            neutralCount: neu || activeProduct.neutralCount || 0,
-            positivePercentage: Math.round(((pos || activeProduct.positiveCount || 0) / total) * 100),
-            negativePercentage: Math.round(((neg || activeProduct.negativeCount || 0) / total) * 100),
-            neutralPercentage: Math.round(((neu || activeProduct.neutralCount || 0) / total) * 100),
-            averageRating: 4.4,
-            positiveThemes: [
-              { theme: 'Taste & Flavor Profile', count: Math.max(1, pos), percentage: 70, representativeQuote: 'Rich taste, aromatic spices and perfectly cooked.' },
-              { theme: 'Freshness & Texture', count: Math.max(1, Math.round(pos * 0.6)), percentage: 55, representativeQuote: 'Very fresh ingredients and soft texture.' }
-            ],
-            negativeThemes: neg > 0 ? [
-              { theme: 'Packaging & Temperature', count: neg, percentage: 35, representativeQuote: 'Food arrived lukewarm, container lid could be tighter.' }
-            ] : [],
-            nonsenseReviews: [],
-          });
+          if (total === 0) {
+            setAnalysisData({
+              productName: activeProduct.name,
+              totalReviews: 0,
+              positiveCount: 0,
+              negativeCount: 0,
+              neutralCount: 0,
+              positivePercentage: 0,
+              negativePercentage: 0,
+              neutralPercentage: 0,
+              averageRating: null,
+              positiveThemes: [],
+              negativeThemes: [],
+              nonsenseReviews: [],
+            });
+          } else {
+            const posPct = Math.round((pos / total) * 100);
+            const negPct = Math.round((neg / total) * 100);
+            const neuPct = Math.max(0, 100 - posPct - negPct);
+
+            const themeMap: Record<string, { count: number; quotes: string[] }> = {};
+            rawReviews.forEach((r: any) => {
+              if (r.theme && r.theme.trim()) {
+                if (!themeMap[r.theme]) themeMap[r.theme] = { count: 0, quotes: [] };
+                themeMap[r.theme].count++;
+                if (r.customer_review && themeMap[r.theme].quotes.length < 3) {
+                  themeMap[r.theme].quotes.push(r.customer_review);
+                }
+              }
+            });
+
+            const realPositiveThemes = Object.entries(themeMap).map(([theme, d]) => ({
+              theme,
+              count: d.count,
+              percentage: Math.round((d.count / total) * 100),
+              representativeQuote: d.quotes[0] || '',
+            })).slice(0, 5);
+
+            setAnalysisData({
+              productName: activeProduct.name,
+              totalReviews: total,
+              positiveCount: pos,
+              negativeCount: neg,
+              neutralCount: neu,
+              positivePercentage: posPct,
+              negativePercentage: negPct,
+              neutralPercentage: neuPct,
+              averageRating: Number((rawReviews.reduce((sum, r) => sum + (Number(r.rating) || 4), 0) / total).toFixed(1)),
+              positiveThemes: realPositiveThemes,
+              negativeThemes: [],
+              nonsenseReviews: [],
+            });
+          }
         }
       } catch (e) {
         console.warn('Failed to load review analysis:', e);
@@ -547,6 +578,15 @@ export const AnalysisPage: React.FC = () => {
 
   // Rating distribution data (simulate 1-5 star distribution)
   const ratingDistribution = useMemo(() => {
+    if (!analysis.totalReviews) {
+      return [
+        { rating: '5★', count: 0, color: PALETTE.categorical.positive, sentiment: 'positive' },
+        { rating: '4★', count: 0, color: '#34d399', sentiment: 'positive' },
+        { rating: '3★', count: 0, color: PALETTE.categorical.neutral, sentiment: 'neutral' },
+        { rating: '2★', count: 0, color: '#fca5a5', sentiment: 'negative' },
+        { rating: '1★', count: 0, color: PALETTE.categorical.negative, sentiment: 'negative' },
+      ];
+    }
     const base = analysis.positiveCount || 0;
     const neg = analysis.negativeCount || 0;
     const neu = analysis.neutralCount || 0;
@@ -557,10 +597,11 @@ export const AnalysisPage: React.FC = () => {
       { rating: '2★', count: Math.round(neg * 0.4), color: '#fca5a5', sentiment: 'negative' },
       { rating: '1★', count: Math.round(neg * 0.4), color: PALETTE.categorical.negative, sentiment: 'negative' },
     ];
-  }, [analysis.positiveCount, analysis.negativeCount, analysis.neutralCount]);
+  }, [analysis.totalReviews, analysis.positiveCount, analysis.negativeCount, analysis.neutralCount]);
 
   // Simulated weekly trend data (last 8 weeks)
   const weeklyTrendData = useMemo(() => {
+    if (!analysis.totalReviews) return [];
     const basePos = posPct;
     const baseNeg = negPct;
     return Array.from({ length: 8 }, (_, i) => {
@@ -578,10 +619,11 @@ export const AnalysisPage: React.FC = () => {
         avgRating: (5 * pos + 3 * neu + 1 * neg) / 100
       };
     }).reverse();
-  }, [posPct, negPct]);
+  }, [analysis.totalReviews, posPct, negPct]);
 
   // Platform comparison data
   const platformComparisonData = useMemo(() => {
+    if (!analysis.totalReviews && reviewsList.length === 0) return [];
     const platforms = reviewsList.length > 0
       ? [...new Set(reviewsList.map(r => r.platform).filter(Boolean))]
       : ['Zomato', 'Swiggy', 'Spreadsheet'];
@@ -594,9 +636,9 @@ export const AnalysisPage: React.FC = () => {
       const total = platformReviews.length || Math.ceil(analysis.totalReviews / platforms.length);
       return {
         platform,
-        positive: Math.round((pos / total) * 100) || Math.max(40, 85 - i * 15),
-        negative: Math.round((neg / total) * 100) || Math.max(5, 10 + i * 5),
-        neutral: Math.round((neu / total) * 100) || Math.max(10, 15 + i * 3),
+        positive: total > 0 ? Math.round((pos / total) * 100) : 0,
+        negative: total > 0 ? Math.round((neg / total) * 100) : 0,
+        neutral: total > 0 ? Math.round((neu / total) * 100) : 0,
         totalReviews: total,
         avgRating: platformReviews.length > 0
           ? platformReviews.reduce((sum, r) => sum + (r.rating || 3.5), 0) / platformReviews.length
