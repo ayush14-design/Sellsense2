@@ -116,6 +116,21 @@ export const SignupPage: React.FC = () => {
       authStorage.setUser(user);
       localStorage.setItem('auth_token', token);
 
+      // Persist to registered users so admin panel sees new sign-ups
+      try {
+        const reg: any[] = JSON.parse(localStorage.getItem('sellsense_registered_users') || '[]');
+        if (!reg.find((u: any) => u.id === user.id || u.email === user.email)) {
+          reg.unshift({
+            id: user.id,
+            email: user.email,
+            fullName: user.fullName,
+            role: user.role || 'restaurant_owner',
+            createdAt: user.createdAt || new Date().toISOString(),
+          });
+          localStorage.setItem('sellsense_registered_users', JSON.stringify(reg));
+        }
+      } catch {}
+
       const targetRestaurant = restaurant || {
         id: `rest_${user.id}`,
         name: user.fullName ? `${user.fullName}'s Restaurant` : 'My Restaurant',

@@ -44,8 +44,10 @@ class BackendApiService {
 
       return response.json();
     } catch (err: any) {
-      if (err.name === 'TypeError' && (err.message === 'Failed to fetch' || err.message?.includes('fetch'))) {
-        throw new Error(`Cannot connect to SellSense backend server at ${API_BASE}. Please ensure the server is running on port 3001.`);
+      // Preserve the original error so callers can detect network failures vs HTTP errors
+      // Tag network/fetch errors so callers can identify them
+      if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('fetch') || err.message?.includes('NetworkError') || err.message?.includes('Cannot connect')) {
+        err._isNetworkError = true;
       }
       throw err;
     }
@@ -195,24 +197,42 @@ class BackendApiService {
     hasRestaurant: boolean;
     restaurant: any | null;
   }> {
+    // Try the backend first; if it fails for any reason (network, 404, 500, CORS)
+    // fall through to the client-side fallback so the live Vercel site always works.
+    let backendFailed = false;
     try {
-      return await this.request('/auth/google', {
+      const result = await this.request<any>('/auth/google', {
         method: 'POST',
         body: JSON.stringify(data),
       });
-    } catch (fetchErr) {
-      // Client-side fallback (e.g. for Vercel deployment where backend port 3001 is unreachable)
+      // If backend succeeded, also save to localStorage so admin panel sees the user
+      if (result?.user) {
+        try {
+          const reg: any[] = JSON.parse(localStorage.getItem('sellsense_registered_users') || '[]');
+          if (!reg.find((u: any) => u.id === result.user.id || u.email === result.user.email)) {
+            reg.unshift({ ...result.user, createdAt: result.user.createdAt || new Date().toISOString() });
+            localStorage.setItem('sellsense_registered_users', JSON.stringify(reg));
+          }
+        } catch {}
+      }
+      return result;
+    } catch {
+      backendFailed = true;
+    }
+
+    // ── Client-side fallback (Vercel / no backend) ────────────────────────────
+    if (backendFailed) {
       let email = (data.email || '').trim().toLowerCase();
       let fullName = (data.fullName || '').trim();
 
-      if (data.credential && typeof data.credential === 'string') {
+      if (data.credential && typeof data.credential === 'string' && data.credential.includes('.')) {
         const decoded = decodeJwtPayload(data.credential);
         if (decoded.email) email = decoded.email.toLowerCase().trim();
         if (decoded.name) fullName = decoded.name.trim();
       }
 
       if (!email) {
-        throw new Error('Google email address is required for authentication.');
+        throw new Error('Google email address is required. Please enter your Gmail address in the field below.');
       }
 
       if (!fullName) {
@@ -231,6 +251,15 @@ class BackendApiService {
         createdAt: new Date().toISOString(),
         isActive: true,
       };
+
+      // Persist user to localStorage so admin panel and other pages can see them
+      try {
+        const reg: any[] = JSON.parse(localStorage.getItem('sellsense_registered_users') || '[]');
+        if (!reg.find((u: any) => u.id === userId || u.email === email)) {
+          reg.unshift(user);
+          localStorage.setItem('sellsense_registered_users', JSON.stringify(reg));
+        }
+      } catch {}
 
       const restaurantId = `rest_${userId}`;
       const restaurant = {
@@ -251,13 +280,10 @@ class BackendApiService {
 
       const token = `ss_gtoken_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-      return {
-        user,
-        token,
-        hasRestaurant: true,
-        restaurant,
-      };
+      return { user, token, hasRestaurant: true, restaurant };
     }
+
+    throw new Error('Authentication failed. Please try again.');
   }
 
   async getMe(): Promise<{ user: any; restaurant: any | null }> {
