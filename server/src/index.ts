@@ -37,7 +37,7 @@ app.use(cors({
 app.use(express.json({ limit: '15mb' }));
 
 // Health check
-app.get('/health', (req, res) => {
+app.get(['/health', '/api/health'], (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 

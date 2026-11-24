@@ -59,10 +59,18 @@ export const SetupPage: React.FC<SetupPageProps> = ({ mode }) => {
     description: existingRestaurant?.description || 'Authentic dining experience',
   });
 
-  // Step 2: Platform Connections (Google REMOVED per requirement 1: Only Zomato & Swiggy)
+  // Helper to safely check platform source regardless of string/array format
+  const hasPlatformSource = (sources: any, platform: string) => {
+    if (!sources) return false;
+    if (Array.isArray(sources)) return sources.includes(platform);
+    if (typeof sources === 'string') return sources.includes(platform);
+    return false;
+  };
+
+  // Step 2: Platform Connections (Only Zomato & Swiggy)
   const [connections, setConnections] = useState<{ [key: string]: string }>({
-    Zomato: existingRestaurant?.reviewSources?.includes('Zomato') ? 'Connected' : 'Not Connected',
-    Swiggy: existingRestaurant?.reviewSources?.includes('Swiggy') ? 'Connected' : 'Not Connected',
+    Zomato: hasPlatformSource(existingRestaurant?.reviewSources, 'Zomato') ? 'Connected' : 'Not Connected',
+    Swiggy: hasPlatformSource(existingRestaurant?.reviewSources, 'Swiggy') ? 'Connected' : 'Not Connected',
   });
 
 

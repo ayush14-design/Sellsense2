@@ -190,15 +190,21 @@ authRouter.post('/google', async (req: Request, res: Response) => {
   try {
     const { credential, email: inputEmail, fullName: inputFullName } = req.body;
 
-    let email = inputEmail;
-    let fullName = inputFullName;
+    let email = (inputEmail || '').trim();
+    let fullName = (inputFullName || '').trim();
 
     // Verify Google ID token credential if provided
     if (credential && typeof credential === 'string') {
       try {
-        // First attempt online token verification with Google
-        const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
-        if (googleRes.ok) {
+        // Safe 3-second timeout for Google token verification
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`, {
+          signal: controller.signal
+        }).catch(() => null);
+        clearTimeout(timeoutId);
+
+        if (googleRes && googleRes.ok) {
           const tokenInfo = (await googleRes.json()) as any;
           if (tokenInfo.email) email = tokenInfo.email;
           if (tokenInfo.name) fullName = tokenInfo.name;
@@ -206,7 +212,10 @@ authRouter.post('/google', async (req: Request, res: Response) => {
           // Fallback to base64 JWT payload decode if verification response fails
           const parts = credential.split('.');
           if (parts.length === 3) {
-            const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            let payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            while (payloadBase64.length % 4 !== 0) {
+              payloadBase64 += '=';
+            }
             const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf8');
             const parsed = JSON.parse(payloadJson);
             if (parsed.email) email = parsed.email;
@@ -218,7 +227,10 @@ authRouter.post('/google', async (req: Request, res: Response) => {
         try {
           const parts = credential.split('.');
           if (parts.length === 3) {
-            const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            let payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            while (payloadBase64.length % 4 !== 0) {
+              payloadBase64 += '=';
+            }
             const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf8');
             const parsed = JSON.parse(payloadJson);
             if (parsed.email) email = parsed.email;
@@ -231,7 +243,7 @@ authRouter.post('/google', async (req: Request, res: Response) => {
     }
 
     if (!email) {
-      return res.status(400).json({ error: 'Google email is required' });
+      return res.status(400).json({ error: 'Google email address is required' });
     }
 
     fullName = fullName || email.split('@')[0];
@@ -249,7 +261,7 @@ authRouter.post('/google', async (req: Request, res: Response) => {
       db.prepare(`
         INSERT INTO users (id, email, password_hash, full_name, role, is_active)
         VALUES (?, ?, ?, ?, ?, 1)
-      `).run(userId, email, '$2a$10$google_oauth_user', fullName, role);
+      `).run(userId, normalizedEmail, '$2a$10$google_oauth_user', fullName, role);
 
       user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as any;
     } else {
@@ -313,7 +325,9 @@ authRouter.post('/google', async (req: Request, res: Response) => {
         location: restaurant.location,
         contactEmail: restaurant.contact_email,
         description: restaurant.description,
-        reviewSources: JSON.parse(restaurant.review_sources || '["Zomato"]'),
+        reviewSources: typeof restaurant.review_sources === 'string'
+          ? JSON.parse(restaurant.review_sources)
+          : (restaurant.review_sources || ['Zomato']),
         dataMode: restaurant.data_mode,
         createdAt: restaurant.created_at,
         ownerId: restaurant.owner_id,

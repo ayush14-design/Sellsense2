@@ -27,6 +27,13 @@ import {
   Clock,
   Globe,
   MousePointer2,
+  Cpu,
+  Rocket,
+  Target,
+  Users,
+  ArrowUpRight,
+  Loader2,
+  Upload,
 } from 'lucide-react';
 import { authStorage } from '../utils/auth';
 
@@ -267,6 +274,141 @@ const FloatingParticles = () => {
   );
 };
 
+// Animated Gradient Mesh Background
+const GradientMesh = ({ className = '' }: { className?: string }) => {
+  return (
+    <div className={`absolute inset-0 overflow-hidden pointer-events-none -z-20 ${className}`}>
+      <motion.div
+        className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-gradient-to-r from-lime-500/8 via-emerald-500/6 to-cyan-500/8 rounded-full blur-3xl"
+        animate={{
+          scale: [1, 1.15, 1],
+          borderRadius: ['60% 40% 30% 70%/60% 30% 70% 40%', '40% 60% 70% 30%/40% 70% 30% 60%', '60% 40% 30% 70%/60% 30% 70% 40%'],
+        }}
+        transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] bg-gradient-to-l from-cyan-500/6 via-emerald-500/4 to-lime-500/6 rounded-full blur-3xl"
+        animate={{
+          scale: [1, 1.1, 1],
+          borderRadius: ['30% 70% 70% 30%/30% 70% 70% 30%', '70% 30% 30% 70%/70% 30% 30% 70%', '30% 70% 70% 30%/30% 70% 70% 30%'],
+        }}
+        transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut', delay: 5 }}
+      />
+      <motion.div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-tr from-lime-500/3 via-transparent to-cyan-500/3 rounded-full blur-3xl"
+        animate={{
+          opacity: [0.15, 0.3, 0.15],
+          rotate: [0, 180, 360],
+        }}
+        transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+      />
+    </div>
+  );
+};
+
+// Shimmer Text Effect
+const ShimmerText = ({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) => {
+  return (
+    <motion.span
+      className={`relative inline bg-clip-text text-transparent bg-gradient-to-r from-lime-500 via-emerald-400 to-cyan-400 ${className}`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.6, delay }}
+    >
+      {children}
+    </motion.span>
+  );
+};
+
+// Floating Badge Component
+const FloatingBadge = ({ children, className = '', icon: Icon, iconColor = 'lime', delay = 0 }: {
+  children: React.ReactNode;
+  className?: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  iconColor?: string;
+  delay?: number;
+}) => {
+  return (
+    <motion.div
+      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 text-sm font-semibold text-slate-900 dark:text-white ${className}`}
+      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+      animate={{
+        opacity: 1,
+        scale: 1,
+        y: [0, -3, 0],
+      }}
+      transition={{
+        duration: 0.5,
+        delay,
+        y: { duration: 3, repeat: Infinity, ease: 'easeInOut' }
+      }}
+      whileHover={{ scale: 1.05, y: -5 }}
+    >
+      <Icon size={14} className={`text-${iconColor}-600 dark:text-${iconColor}-400`} />
+      {children}
+    </motion.div>
+  );
+};
+
+// Scroll Reveal Stagger Container
+const StaggerContainer = ({ children, className = '', stagger = 0.1, delay = 0 }: {
+  children: React.ReactNode;
+  className?: string;
+  stagger?: number;
+  delay?: number;
+}) => {
+  return (
+    <motion.div
+      className={className}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ staggerChildren: stagger, delayChildren: delay }}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+const StaggerItem = ({ children, className = '', y = 20 }: {
+  children: React.ReactNode;
+  className?: string;
+  y?: number;
+}) => {
+  return (
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+// Pulse Glow Effect for CTAs
+const PulseGlow = ({ children, className = '', color = 'lime' }: {
+  children: React.ReactNode;
+  className?: string;
+  color?: string;
+}) => {
+  return (
+    <motion.div
+      className={className}
+      animate={{
+        boxShadow: [
+          `0 0 0 0 ${color}-500/40`,
+          `0 0 30px 10px ${color}-500/20`,
+          `0 0 0 0 ${color}-500/40`,
+        ],
+      }}
+      transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [selectedDishKey, setSelectedDishKey] = useState<string>('paneer_tikka');
@@ -338,6 +480,9 @@ export const LandingPage: React.FC = () => {
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 px-6 overflow-hidden">
+        {/* Animated Gradient Mesh Background */}
+        <GradientMesh />
+
         {/* Floating Particles */}
         <FloatingParticles />
 
@@ -353,103 +498,150 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
             {/* Left Content */}
-            <motion.div
-              ref={useScrollAnimation(0.1).ref}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className="lg:col-span-7 space-y-6 text-left"
-            >
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.1 }}
-                className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-lime-500/10 dark:bg-lime-500/20 text-lime-700 dark:text-lime-300 border border-lime-500/20 text-xs font-semibold tracking-wide"
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime-500 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-lime-600 dark:bg-lime-400" />
-                </span>
-                Restaurant Review Intelligence Platform
-              </motion.div>
+            <StaggerContainer className="lg:col-span-7 space-y-6 sm:space-y-8" stagger={0.1} delay={0.1}>
+              <StaggerItem y={30}>
+                <motion.div
+                  className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-lime-500/10 dark:bg-lime-500/20 text-lime-700 dark:text-lime-300 border border-lime-500/20 text-xs font-semibold tracking-wide"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime-500 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-lime-600 dark:bg-lime-400" />
+                  </span>
+                  Restaurant Review Intelligence Platform
+                </motion.div>
+              </StaggerItem>
 
-              <motion.h1
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.12]"
-              >
-                Turn Customer Reviews Into{' '}
-                <span className="bg-gradient-to-r from-lime-600 via-emerald-600 to-cyan-600 dark:from-lime-400 dark:via-emerald-400 dark:to-cyan-400 bg-clip-text text-transparent">
-                  Smarter Food Decisions
-                </span>
-              </motion.h1>
+              <StaggerItem>
+                <motion.h1
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
+                  className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.12]"
+                >
+                  Turn Customer Reviews Into{' '}
+                  <ShimmerText className="bg-gradient-to-r from-lime-600 via-emerald-600 to-cyan-600 dark:from-lime-400 dark:via-emerald-400 dark:to-cyan-400 bg-clip-text text-transparent">
+                    Smarter Food Decisions
+                  </ShimmerText>
+                </motion.h1>
+              </StaggerItem>
 
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="text-lg sm:text-xl text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl"
-              >
-                Stop guessing why ratings fluctuate. SellSense consolidates reviews across Zomato, Google Maps, and Swiggy into clear, dish-level sentiment analytics so you know what customers love and what needs fixing.
-              </motion.p>
+              <StaggerItem>
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
+                  className="text-lg sm:text-xl text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl"
+                >
+                  Stop guessing why ratings fluctuate. SellSense consolidates reviews across Zomato, Google Maps, and Swiggy into clear, dish-level sentiment analytics so you know what customers love and what needs fixing.
+                </motion.p>
+              </StaggerItem>
 
               {/* Action Buttons */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-                className="flex flex-wrap items-center gap-4 pt-2"
-              >
-                <SizedButton
-                  size="lg"
-                  onClick={handleGetStarted}
-                  className="bg-lime-500 hover:bg-lime-400 text-slate-950 font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer"
+              <StaggerItem>
+                <motion.div
+                  className="flex flex-wrap items-center gap-4 pt-2"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
                 >
-                  Get Started Free
-                  <ArrowRight size={18} />
-                </SizedButton>
-                <motion.button
-                  onClick={handleExploreDemo}
-                  className="px-6 py-4 rounded-xl font-semibold text-base bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 shadow-sm transition-all flex items-center gap-2 cursor-pointer"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  <PulseGlow color="lime">
+                    <motion.button
+                      onClick={handleGetStarted}
+                      className="px-8 py-4 text-lg rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer relative z-10"
+                      whileHover={{ scale: 1.03, y: -2 }}
+                      whileTap={{ scale: 0.96 }}
+                    >
+                      Get Started Free
+                      <ArrowRight size={18} />
+                    </motion.button>
+                  </PulseGlow>
+                  <motion.button
+                    onClick={handleExploreDemo}
+                    className="px-6 py-4 rounded-xl font-semibold text-base bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 shadow-sm transition-all flex items-center gap-2 cursor-pointer relative overflow-hidden"
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Eye size={18} className="text-lime-600 dark:text-lime-400" />
+                    Explore Live Demo
+                    <motion.span
+                      className="absolute inset-0 bg-gradient-to-r from-lime-500/20 to-emerald-500/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                    />
+                  </motion.button>
+                </motion.div>
+              </StaggerItem>
+
+              {/* Key Metrics Strip */}
+              <StaggerItem>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.3 }}
+                  className="flex flex-wrap gap-8 pt-6 border-t border-slate-200 dark:border-slate-800"
                 >
-                  <Eye size={18} className="text-lime-600 dark:text-lime-400" />
-                  Explore Live Demo
-                </motion.button>
-              </motion.div>
+                  <div className="flex items-center gap-2">
+                    <motion.div
+                      animate={{ scale: [1, 1.15, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity, delay: 0 }}
+                      className="text-lime-600 dark:text-lime-400"
+                    >
+                      <Rocket size={20} />
+                    </motion.div>
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-white">2 min</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Setup time</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <motion.div
+                      animate={{ scale: [1, 1.15, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity, delay: 0.3 }}
+                      className="text-emerald-600 dark:text-emerald-400"
+                    >
+                      <Users size={20} />
+                    </motion.div>
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-white">3</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Platforms</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <motion.div
+                      animate={{ scale: [1, 1.15, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity, delay: 0.6 }}
+                      className="text-cyan-600 dark:text-cyan-400"
+                    >
+                      <Target size={20} />
+                    </motion.div>
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-white">92%+</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Accuracy</div>
+                    </div>
+                  </div>
+                </motion.div>
+              </StaggerItem>
 
               {/* Core Value Chips */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.5 }}
-                className="grid sm:grid-cols-3 gap-3 pt-6 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400"
-              >
-                {[
-                  { icon: CheckCircle2, text: 'Dish-by-dish analysis' },
-                  { icon: AlertCircle, text: 'Detect repeated complaints' },
-                  { icon: Sparkles, text: 'Practical AI kitchen advice' },
-                ].map((item, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.4, delay: 0.5 + i * 0.1 }}
-                    className="flex items-center gap-2"
-                    whileHover={{ x: 4 }}
-                  >
-                    <item.icon size={16} className="text-lime-600 dark:text-lime-400 shrink-0" />
-                    <span>{item.text}</span>
-                  </motion.div>
-                ))}
-              </motion.div>
-            </motion.div>
+              <StaggerItem>
+                <div className="flex flex-wrap gap-2 pt-6 border-t border-slate-200 dark:border-slate-800">
+                  <FloatingBadge icon={CheckCircle2} iconColor="emerald" delay={0.1}>
+                    Dish-by-dish analysis
+                  </FloatingBadge>
+                  <FloatingBadge icon={AlertCircle} iconColor="rose" delay={0.2}>
+                    Detect repeated complaints
+                  </FloatingBadge>
+                  <FloatingBadge icon={Sparkles} iconColor="purple" delay={0.3}>
+                    Practical AI kitchen advice
+                  </FloatingBadge>
+                </div>
+              </StaggerItem>
+            </StaggerContainer>
 
             {/* Right Interactive Visual */}
             <div className="lg:col-span-5">
-              <div className="relative mx-auto max-w-md lg:max-w-none">
+              <div className="relative mx-auto max-w-lg lg:max-w-none">
                 {/* Decorative glow */}
                 <motion.div
                   className="absolute -inset-1 bg-gradient-to-r from-lime-500/20 via-emerald-500/20 to-cyan-500/20 rounded-3xl blur-xl opacity-70 dark:opacity-50"
@@ -462,7 +654,7 @@ export const LandingPage: React.FC = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.6, delay: 0.3 }}
                   whileHover={{ y: -3, transition: { duration: 0.2 } }}
-                  className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm"
+                  className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl backdrop-blur-sm w-full"
                 >
                   {/* Card Header & Dish Selector */}
                   <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
@@ -646,19 +838,19 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Supported Platforms Strip */}
-      <section id="integrations" className="py-10 border-y border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40">
+      <section id="integrations" className="py-16 border-y border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-6">
-            <motion.span
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4 }}
-              className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400"
-            >
-              Unified Feedback From Your Key Food Channels
-            </motion.span>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4 }}
+            className="text-center mb-10"
+          >
+            <span className="inline-block px-3.5 py-1 rounded-full bg-lime-500/10 dark:bg-lime-500/20 text-lime-700 dark:text-lime-300 border border-lime-500/20 text-xs font-bold uppercase tracking-wider">
+              Platform Integrations
+            </span>
+          </motion.div>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -730,6 +922,7 @@ export const LandingPage: React.FC = () => {
                 description: 'Look beyond generic 3-star ratings. Uncover exactly how customers evaluate specific menu items like your Biryani, Thali, or Paneer Tikka.',
                 badge: 'Item-level granularity',
                 badgeColor: 'lime',
+                iconHover: 'rotate-12',
               },
               {
                 icon: AlertCircle,
@@ -738,6 +931,7 @@ export const LandingPage: React.FC = () => {
                 description: 'Automatically flags repeat operational issues such as cold food deliveries, leaking curry packaging, or portion inconsistencies.',
                 badge: 'Root-cause detection',
                 badgeColor: 'emerald',
+                iconHover: 'scale-110',
               },
               {
                 icon: Layers,
@@ -746,6 +940,7 @@ export const LandingPage: React.FC = () => {
                 description: 'Combine feedback from Zomato, Google Maps, and Swiggy with manual review uploads into a single, clean workspace.',
                 badge: 'Unified platform view',
                 badgeColor: 'cyan',
+                iconHover: 'rotate-360',
               },
               {
                 icon: ChefHat,
@@ -754,21 +949,29 @@ export const LandingPage: React.FC = () => {
                 description: 'Receive straightforward, actionable recommendations your kitchen team, chef, and packaging staff can implement today.',
                 badge: 'Practical kitchen advice',
                 badgeColor: 'purple',
+                iconHover: 'scale-115',
               },
             ].map((feature, i) => (
               <motion.div
                 key={i}
                 whileHover={{ y: -8, transition: { duration: 0.2 } }}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-lg hover:border-lime-500/40 transition-all duration-300 flex flex-col justify-between"
+                className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:border-lime-500/40 transition-all duration-300 flex flex-col justify-between overflow-hidden group"
               >
-                <div className="space-y-4">
+                {/* Subtle gradient overlay on hover */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-br from-lime-500/0 via-transparent to-emerald-500/0 group-hover:from-lime-500/5 group-hover:to-emerald-500/5 transition-opacity duration-300 pointer-events-none"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                />
+                <div className="relative z-10 space-y-4">
                   <motion.div
-                    whileHover={{ rotate: 12, scale: 1.1 }}
+                    whileHover={{ rotate: feature.iconHover === 'rotate-12' ? 12 : feature.iconHover === 'rotate-360' ? 360 : 0, scale: feature.iconHover.includes('scale') ? 1.1 : 1 }}
+                    transition={{ duration: 0.4 }}
                     className={`w-12 h-12 rounded-xl bg-${feature.iconColor}-500/10 dark:bg-${feature.iconColor}-500/20 flex items-center justify-center text-${feature.iconColor}-600 dark:text-${feature.iconColor}-400`}
                   >
                     <feature.icon size={22} />
                   </motion.div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-lime-600 dark:group-hover:text-lime-400 transition-colors">
                     {feature.title}
                   </h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
@@ -779,10 +982,15 @@ export const LandingPage: React.FC = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: 0.3 }}
-                  className="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800 flex items-center gap-1.5 text-xs font-semibold"
+                  className="relative z-10 pt-6 mt-6 border-t border-slate-100 dark:border-slate-800 flex items-center gap-1.5 text-xs font-semibold"
                   style={{ color: `var(--color-${feature.badgeColor}-700)` }}
                 >
-                  <CheckCircle2 size={14} className="text-lime-600 dark:text-lime-400" />
+                  <motion.span
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
+                  >
+                    <CheckCircle2 size={14} className="text-lime-600 dark:text-lime-400" />
+                  </motion.span>
                   {feature.badge}
                 </motion.div>
               </motion.div>
@@ -844,6 +1052,15 @@ export const LandingPage: React.FC = () => {
             transition={{ duration: 0.5, staggerChildren: 0.15 }}
             className="grid md:grid-cols-3 gap-8 relative"
           >
+            {/* Connecting lines between steps - decorative */}
+            <motion.div
+              className="hidden md:block absolute top-10 left-1/2 w-full h-0.5 bg-gradient-to-r from-lime-500/30 via-emerald-500/30 to-cyan-500/30 -z-10"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 1, delay: 0.5, ease: 'easeOut' }}
+              style={{ transformOrigin: 'center' }}
+            />
+
             {[
               {
                 number: 1,
@@ -852,6 +1069,7 @@ export const LandingPage: React.FC = () => {
                 title: 'Connect or Upload Reviews',
                 description: 'Connect your Zomato or Google listings with our guided setup, or drag and drop customer feedback spreadsheets directly into SellSense.',
                 badge: 'Supports Zomato, Google, Swiggy, & Excel',
+                subIcon: Upload,
               },
               {
                 number: 2,
@@ -860,6 +1078,7 @@ export const LandingPage: React.FC = () => {
                 title: 'AI Isolates Dishes & Themes',
                 description: 'SellSense\'s NLP models scan review text, map feedback to specific menu items, and detect recurring patterns in taste, delivery, and service.',
                 badge: 'Automatic sentiment classification',
+                subIcon: Cpu,
               },
               {
                 number: 3,
@@ -868,26 +1087,46 @@ export const LandingPage: React.FC = () => {
                 title: 'Implement Fixes & Boost Ratings',
                 description: 'Follow targeted recommendations to fix packaging leaks, adjust recipes, or recalibrate portion sizes before negative reviews stack up.',
                 badge: 'Higher ratings & repeat orders',
+                subIcon: Target,
               },
             ].map((step, i) => (
               <motion.div
                 key={i}
                 whileHover={{ y: -8, transition: { duration: 0.2 } }}
-                className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 space-y-4"
+                className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 space-y-4 group"
               >
-                <motion.div
-                  whileHover={{ rotate: 360, scale: 1.1 }}
-                  transition={{ duration: 0.5 }}
-                  className={`w-10 h-10 rounded-xl bg-${step.color}-500 text-slate-950 font-black text-lg flex items-center justify-center shadow-sm`}
-                >
-                  {step.number}
-                </motion.div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                {/* Step number with animated ring */}
+                <div className="relative">
+                  <motion.div
+                    whileHover={{ rotate: 360, scale: 1.1 }}
+                    transition={{ duration: 0.5 }}
+                    className={`w-10 h-10 rounded-xl bg-${step.color}-500 text-slate-950 font-black text-lg flex items-center justify-center shadow-sm relative z-10`}
+                  >
+                    {step.number}
+                  </motion.div>
+                  {/* Pulsing ring animation */}
+                  <motion.div
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-xl border-2"
+                    style={{ borderColor: `var(--color-${step.color}-500)` }}
+                    animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0.1, 0.6] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.5 }}
+                  />
+                  <motion.div
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-xl border-2"
+                    style={{ borderColor: `var(--color-${step.color}-500)` }}
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.05, 0.4] }}
+                    transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.5 + 1 }}
+                  />
+                </div>
+
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-lime-600 dark:group-hover:text-lime-400 transition-colors">
                   {step.title}
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                   {step.description}
                 </p>
+
+                {/* Interactive icon badge */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -895,8 +1134,23 @@ export const LandingPage: React.FC = () => {
                   className="pt-2 text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5"
                   style={{ color: `var(--color-${step.color}-600)` }}
                 >
+                  <motion.div
+                    whileHover={{ scale: 1.15, rotate: 12 }}
+                    className={`w-6 h-6 rounded-lg bg-${step.color}-500/10 dark:bg-${step.color}-500/20 flex items-center justify-center`}
+                  >
+                    <step.subIcon size={12} className={`text-${step.color}-600 dark:text-${step.color}-400`} />
+                  </motion.div>
                   <step.icon size={14} className="text-lime-600 dark:text-lime-400" />
                   {step.badge}
+                </motion.div>
+
+                {/* Arrow indicator */}
+                <motion.div
+                  className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                  whileHover={{ x: [0, 4, 0] }}
+                  transition={{ duration: 0.8, repeat: Infinity }}
+                >
+                  <ArrowUpRight size={16} className={`text-${step.color}-500`} />
                 </motion.div>
               </motion.div>
             ))}
@@ -1020,9 +1274,9 @@ export const LandingPage: React.FC = () => {
               {activePreviewTab === 'dishes' && (
                 <motion.div
                   key="dishes"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
+                  initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.98 }}
                   transition={{ duration: 0.3 }}
                   className="pt-6 space-y-4"
                 >
@@ -1032,9 +1286,9 @@ export const LandingPage: React.FC = () => {
               {activePreviewTab === 'themes' && (
                 <motion.div
                   key="themes"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
+                  initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.98 }}
                   transition={{ duration: 0.3 }}
                   className="pt-6"
                 >
@@ -1044,9 +1298,9 @@ export const LandingPage: React.FC = () => {
               {activePreviewTab === 'recommendations' && (
                 <motion.div
                   key="recommendations"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
+                  initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.98 }}
                   transition={{ duration: 0.3 }}
                   className="pt-6"
                 >
@@ -1054,6 +1308,21 @@ export const LandingPage: React.FC = () => {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Floating Action Button on Preview */}
+            <motion.button
+              onClick={handleExploreDemo}
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 1.2 }}
+              whileHover={{ scale: 1.08, boxShadow: '0 10px 40px -10px var(--color-lime-500)' }}
+              whileTap={{ scale: 0.95 }}
+              className="absolute bottom-6 right-6 sm:bottom-8 sm:right-8 z-20 p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-lime-500 to-emerald-500 text-white font-bold text-xs sm:text-sm shadow-lg flex items-center gap-2 cursor-pointer"
+            >
+              <Loader2 size={16} className="animate-spin" />
+              <span className="hidden sm:inline">Enter Full Dashboard</span>
+              <ArrowUpRight size={14} />
+            </motion.button>
           </motion.div>
         </div>
       </section>
@@ -1069,24 +1338,45 @@ export const LandingPage: React.FC = () => {
             className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center"
           >
             {[
-              { icon: Shield, label: 'Enterprise Security', desc: 'SOC 2 compliant, data encrypted at rest & in transit' },
-              { icon: Zap, label: 'Real-time Analysis', desc: 'Reviews processed within minutes of posting' },
-              { icon: Globe, label: 'Multi-platform', desc: 'Zomato, Swiggy, Google Maps, CSV/Excel' },
-              { icon: Clock, label: '2-min Setup', desc: 'No code, no training, instant insights' },
+              { icon: Shield, label: 'Enterprise Security', desc: 'SOC 2 compliant, data encrypted at rest & in transit', color: 'blue' },
+              { icon: Zap, label: 'Real-time Analysis', desc: 'Reviews processed within minutes of posting', color: 'amber' },
+              { icon: Globe, label: 'Multi-platform', desc: 'Zomato, Swiggy, Google Maps, CSV/Excel', color: 'cyan' },
+              { icon: Clock, label: '2-min Setup', desc: 'No code, no training, instant insights', color: 'purple' },
             ].map((item, i) => (
               <motion.div
                 key={i}
-                whileHover={{ y: -4 }}
-                className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80"
+                whileHover={{ y: -6, transition: { duration: 0.2 } }}
+                className="relative group p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 overflow-hidden"
               >
+                {/* Animated background glow */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-br"
+                  style={{
+                    opacity: 0,
+                    background: `var(--color-${item.color}-500/10)`
+                  }}
+                  whileHover={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                />
                 <motion.div
                   whileHover={{ rotate: 12, scale: 1.1 }}
-                  className="w-12 h-12 rounded-xl bg-lime-500/10 dark:bg-lime-500/20 flex items-center justify-center text-lime-600 dark:text-lime-400 mx-auto mb-4"
+                  className={`w-12 h-12 rounded-xl bg-${item.color}-500/10 dark:bg-${item.color}-500/20 flex items-center justify-center mx-auto mb-4 relative z-10 transition-all duration-300 group-hover:bg-${item.color}-500/20 dark:group-hover:bg-${item.color}-500/30`}
                 >
-                  <item.icon size={22} />
+                  <item.icon size={22} className={`text-${item.color}-600 dark:text-${item.color}-400 group-hover:text-${item.color}-500 dark:group-hover:text-${item.color}-300 transition-colors`} />
                 </motion.div>
-                <h3 className="font-bold text-slate-900 dark:text-white mb-1">{item.label}</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400">{item.desc}</p>
+                <h3 className="font-bold text-slate-900 dark:text-white mb-1 relative z-10 group-hover:text-lime-600 dark:group-hover:text-lime-400 transition-colors">{item.label}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 relative z-10">{item.desc}</p>
+
+                {/* Sparkle decoration on hover */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  whileHover={{ opacity: 1, scale: 1 }}
+                  className="absolute top-3 right-3 w-4 h-4 text-lime-500"
+                  animate={{ rotate: [0, 180, 360] }}
+                  transition={{ duration: 3, repeat: Infinity, delay: i * 0.5 }}
+                >
+                  <Sparkles size={16} />
+                </motion.div>
               </motion.div>
             ))}
           </motion.div>
@@ -1154,7 +1444,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Final Call to Action */}
-      <section id="cta" className="py-20 px-6 bg-slate-900 text-white relative overflow-hidden">
+      <section id="cta" className="py-24 px-6 bg-slate-900 text-white relative overflow-hidden">
         <FloatingParticles />
         <motion.div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-lime-500/10 blur-3xl rounded-full pointer-events-none"
@@ -1167,23 +1457,23 @@ export const LandingPage: React.FC = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, staggerChildren: 0.1 }}
-          className="max-w-4xl mx-auto text-center relative z-10 space-y-6"
+          className="max-w-3xl mx-auto text-center relative z-10 space-y-6"
         >
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-lime-500/20 text-lime-400 text-xs font-bold uppercase tracking-wider">
             Ready to upgrade your restaurant?
           </div>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1]">
             Stop Guessing. Know Exactly What Your Diners Love.
           </h2>
-          <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
             Consolidate reviews from Zomato, Google, and Swiggy into clear kitchen action plans. Start free today with our demo or connect your real store.
           </p>
 
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
             <SizedButton
               size="lg"
               onClick={handleGetStarted}
-              className="bg-lime-400 hover:bg-lime-300 text-slate-950 font-black shadow-lg hover:shadow-xl transition-all flex items-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto bg-lime-400 hover:bg-lime-300 text-slate-950 font-black shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               Start Free Now
               <ArrowRight size={18} />
@@ -1192,52 +1482,59 @@ export const LandingPage: React.FC = () => {
               onClick={handleExploreDemo}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="px-8 py-4 rounded-xl font-bold text-base bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all flex items-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto px-8 py-4 rounded-xl font-bold text-base bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Eye size={18} className="text-lime-400" />
               Try Live Demo
             </motion.button>
           </div>
 
-          <div className="pt-6 text-xs text-slate-400 flex items-center justify-center gap-6">
-            <motion.span whileHover={{ scale: 1.1 }} className="cursor-default">✓ No credit card required</motion.span>
-            <motion.span whileHover={{ scale: 1.1 }} className="cursor-default">✓ Instant demo access</motion.span>
-            <motion.span whileHover={{ scale: 1.1 }} className="cursor-default">✓ Setup in 2 minutes</motion.span>
+          <div className="pt-8 text-sm text-slate-400 flex flex-wrap items-center justify-center gap-4 sm:gap-8">
+            <motion.span whileHover={{ scale: 1.1 }} className="cursor-default flex items-center gap-1.5">
+              <CheckCircle2 size={14} className="text-lime-500" /> No credit card required
+            </motion.span>
+            <motion.span whileHover={{ scale: 1.1 }} className="cursor-default flex items-center gap-1.5">
+              <CheckCircle2 size={14} className="text-lime-500" /> Instant demo access
+            </motion.span>
+            <motion.span whileHover={{ scale: 1.1 }} className="cursor-default flex items-center gap-1.5">
+              <CheckCircle2 size={14} className="text-lime-500" /> Setup in 2 minutes
+            </motion.span>
           </div>
         </motion.div>
       </section>
 
       {/* Minimal Clean Footer */}
-      <footer className="py-12 px-6 bg-slate-950 text-slate-400 border-t border-slate-900 text-xs">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-lime-500 to-cyan-500 flex items-center justify-center font-black text-white text-xs">
+      <footer className="py-16 px-6 bg-slate-950 text-slate-400 border-t border-slate-900 text-xs">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-lime-500 to-cyan-500 flex items-center justify-center font-black text-white text-xs">
               SS
             </div>
-            <span className="font-bold text-sm text-white">SellSense</span>
-            <span className="text-slate-600 dark:text-slate-500">•</span>
-            <span>AI Restaurant Review Intelligence</span>
+            <div>
+              <div className="font-bold text-sm text-white">SellSense</div>
+              <div className="text-slate-500 text-xs">AI Restaurant Review Intelligence</div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <motion.button onClick={() => scrollToSection('features')} whileHover={{ scale: 1.05 }} className="hover:text-white transition-colors cursor-pointer">
+          <div className="flex flex-wrap items-center justify-center gap-6">
+            <motion.button onClick={() => scrollToSection('features')} whileHover={{ scale: 1.05 }} className="hover:text-white transition-colors cursor-pointer text-sm">
               Features
             </motion.button>
-            <motion.button onClick={() => scrollToSection('how-it-works')} whileHover={{ scale: 1.05 }} className="hover:text-white transition-colors cursor-pointer">
+            <motion.button onClick={() => scrollToSection('how-it-works')} whileHover={{ scale: 1.05 }} className="hover:text-white transition-colors cursor-pointer text-sm">
               How It Works
             </motion.button>
-            <motion.button onClick={() => scrollToSection('preview')} whileHover={{ scale: 1.05 }} className="hover:text-white transition-colors cursor-pointer">
+            <motion.button onClick={() => scrollToSection('preview')} whileHover={{ scale: 1.05 }} className="hover:text-white transition-colors cursor-pointer text-sm">
               Live Preview
             </motion.button>
-            <motion.button onClick={() => scrollToSection('faq')} whileHover={{ scale: 1.05 }} className="hover:text-white transition-colors cursor-pointer">
+            <motion.button onClick={() => scrollToSection('faq')} whileHover={{ scale: 1.05 }} className="hover:text-white transition-colors cursor-pointer text-sm">
               FAQ
             </motion.button>
-            <motion.button onClick={handleExploreDemo} whileHover={{ scale: 1.05 }} className="text-lime-400 font-bold hover:underline cursor-pointer">
+            <motion.button onClick={handleExploreDemo} whileHover={{ scale: 1.05 }} className="text-lime-400 font-bold hover:underline cursor-pointer text-sm">
               Demo Login
             </motion.button>
           </div>
 
-          <div className="text-slate-500">
+          <div className="text-slate-500 text-sm">
             © 2026 SellSense. Built for food creators.
           </div>
         </div>
@@ -1267,11 +1564,19 @@ const StatCard = ({ label, value, suffix = '', trend, trendColor, detail, icon: 
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.4 }}
-      className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80"
+      className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 relative overflow-hidden group"
     >
-      <div className="flex items-center justify-between">
+      {/* Subtle top border animation */}
+      <motion.div
+        className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-lime-500 to-emerald-500"
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: 1 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        style={{ transformOrigin: 'left' }}
+      />
+      <div className="flex items-center justify-between relative z-10">
         <motion.div
-          whileHover={{ scale: 1.1 }}
+          whileHover={{ scale: 1.1, rotate: 6 }}
           className={`w-8 h-8 rounded-lg bg-${iconColor}-500/10 text-${iconColor}-600 flex items-center justify-center`}
         >
           <Icon size={18} />
@@ -1291,7 +1596,7 @@ const StatCard = ({ label, value, suffix = '', trend, trendColor, detail, icon: 
       <AnimatedCounter
         value={value}
         suffix={suffix}
-        className="text-3xl font-extrabold text-slate-900 dark:text-white mt-2"
+        className="text-3xl font-extrabold text-slate-900 dark:text-white mt-2 relative z-10"
         duration={1.5}
       />
       {detail && (
@@ -1299,7 +1604,7 @@ const StatCard = ({ label, value, suffix = '', trend, trendColor, detail, icon: 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
-          className={`text-[11px] font-medium mt-1 ${trendColor === 'emerald' ? 'text-emerald-600' : trendColor === 'rose' ? 'text-rose-600' : 'text-slate-500'}`}
+          className={`text-[11px] font-medium mt-1 ${trendColor === 'emerald' ? 'text-emerald-600' : trendColor === 'rose' ? 'text-rose-600' : 'text-slate-500'} relative z-10`}
         >
           {detail}
         </motion.div>
@@ -1308,9 +1613,19 @@ const StatCard = ({ label, value, suffix = '', trend, trendColor, detail, icon: 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1"
+        className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 relative z-10"
       >
         {label}
+      </motion.div>
+
+      {/* Sparkle on hover */}
+      <motion.div
+        className="absolute top-3 right-3 w-5 h-5 text-lime-500/50 group-hover:text-lime-500/100 transition-opacity"
+        initial={{ opacity: 0, scale: 0.5, rotate: -45 }}
+        whileHover={{ opacity: 1, scale: 1, rotate: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <Sparkles size={16} />
       </motion.div>
     </motion.div>
   );
@@ -1490,27 +1805,47 @@ const RecommendationsPreview = () => {
       {recommendations.map((rec, i) => (
         <motion.div
           key={i}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, y: 20, x: -20 }}
+          animate={{ opacity: 1, y: 0, x: 0 }}
           transition={{ duration: 0.4, delay: i * 0.1 }}
-          whileHover={{ x: 4 }}
-          className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-start gap-3"
+          whileHover={{ x: 6, transition: { duration: 0.2 } }}
+          className="relative p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-start gap-3 group overflow-hidden"
         >
+          {/* Left accent bar */}
           <motion.div
-            whileHover={{ rotate: 12, scale: 1.1 }}
-            className={`w-8 h-8 rounded-lg bg-${rec.iconColor}-500/10 text-${rec.iconColor}-600 flex items-center justify-center shrink-0 mt-0.5`}
+            className="absolute left-0 top-0 bottom-0 w-1"
+            style={{ background: `var(--color-${rec.impactColor}-500)`, transformOrigin: 'bottom' }}
+            initial={{ scaleY: 0 }}
+            animate={{ scaleY: 1 }}
+            transition={{ duration: 0.3, delay: i * 0.1 + 0.2 }}
+          />
+          <motion.div
+            whileHover={{ rotate: 12, scale: 1.15 }}
+            className={`w-8 h-8 rounded-lg bg-${rec.iconColor}-500/10 text-${rec.iconColor}-600 flex items-center justify-center shrink-0 mt-0.5 relative z-10`}
           >
             <rec.icon size={16} />
           </motion.div>
-          <div>
+          <div className="relative z-10">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-900 dark:text-white">{rec.title}</span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${rec.impactColor === 'rose' ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300' : rec.impactColor === 'amber' ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300' : 'bg-cyan-100 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300'}`}>
+              <span className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-lime-600 dark:group-hover:text-lime-400 transition-colors">{rec.title}</span>
+              <motion.span
+                whileHover={{ scale: 1.05 }}
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${rec.impactColor === 'rose' ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300' : rec.impactColor === 'amber' ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300' : 'bg-cyan-100 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300'}`}
+              >
                 {rec.impact}
-              </span>
+              </motion.span>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{rec.description}</p>
           </div>
+
+          {/* Arrow indicator on hover */}
+          <motion.div
+            className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+            whileHover={{ x: [0, 4, 0] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+          >
+            <ArrowUpRight size={14} className={`text-${rec.impactColor}-500`} />
+          </motion.div>
         </motion.div>
       ))}
     </div>

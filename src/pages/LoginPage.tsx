@@ -41,7 +41,7 @@ export const LoginPage: React.FC = () => {
       setGoogleModalOpen(false);
 
       const isSetupDone = localStorage.getItem(`sellsense_setup_done_${user.id}`) === 'true';
-      if (!isSetupDone && (!restaurant?.description || restaurant?.description === 'Restaurant Profile')) {
+      if (!isSetupDone && (!restaurant?.description || restaurant?.description.toLowerCase() === 'restaurant profile')) {
         navigate('/setup');
       } else {
         navigate('/products');
@@ -89,7 +89,7 @@ export const LoginPage: React.FC = () => {
         }
 
         const isSetupDone = localStorage.getItem(`sellsense_setup_done_${loginRes.user.id}`) === 'true';
-        if (!isSetupDone && (!loginRes.restaurant?.description || loginRes.restaurant?.description === 'Restaurant Profile')) {
+        if (!isSetupDone && (!loginRes.restaurant?.description || loginRes.restaurant?.description.toLowerCase() === 'restaurant profile')) {
           navigate('/setup');
         } else {
           navigate('/products');
