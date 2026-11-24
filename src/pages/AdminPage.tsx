@@ -76,6 +76,8 @@ export const AdminPage: React.FC = () => {
   const [grantSubModalOpen, setGrantSubModalOpen] = useState(false);
   const [featureOverrideModalOpen, setFeatureOverrideModalOpen] = useState(false);
   const [selectedFeatureForOverride, setSelectedFeatureForOverride] = useState<any>(null);
+  // Quick inline grant modal (replaces browser prompt())
+  const [quickGrantUser, setQuickGrantUser] = useState<any>(null);
 
   const currentUser = authStorage.getUser();
 
@@ -1808,11 +1810,13 @@ export const AdminPage: React.FC = () => {
       }
     };
 
-    const handleGrantUserPremium = async (u: any) => {
-      const days = prompt(`Grant premium features to ${u.full_name}. Enter duration in days:`, '30');
-      if (!days || isNaN(parseInt(days))) return;
-      const numDays = parseInt(days);
-      // Persist granted premium to localStorage immediately
+    const handleGrantUserPremium = (u: any) => {
+      // Open inline modal instead of browser prompt() which is blocked in production
+      setQuickGrantUser(u);
+    };
+
+    const handleConfirmGrantPremium = async (u: any, numDays: number) => {
+      // Persist to localStorage immediately
       try {
         const grants: Record<string, any> = JSON.parse(localStorage.getItem('sellsense_admin_premium_grants') || '{}');
         grants[u.id] = {
@@ -1826,17 +1830,36 @@ export const AdminPage: React.FC = () => {
         };
         localStorage.setItem('sellsense_admin_premium_grants', JSON.stringify(grants));
       } catch {}
-      // Optimistic UI
-      setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, active_subscriptions: 1, is_premium: 1 } : usr));
-      // Best-effort backend
+      // Also save as approved payment submission so subscription tab reflects it
       try {
-        await backendApi.adminAction(`users/${u.id}/grant-premium`, {
-          durationDays: numDays,
-          adminNote: `Manual permission granted by admin for ${numDays} days`,
+        const stored = JSON.parse(localStorage.getItem('sellsense_payment_submissions') || '[]');
+        stored.unshift({
+          id: `pay_manual_${Date.now()}`,
+          user_id: u.id,
+          user_name: u.full_name,
+          user_email: u.email,
+          restaurant_name: `${u.full_name}'s Restaurant`,
+          restaurant_owner_name: u.full_name,
+          plan_name: 'Basic Plan',
+          amount_inr: 531,
+          status: 'approved',
+          permission_granted: true,
+          has_active_subscription: 1,
+          transaction_reference: `ADMIN_GRANT_${Date.now().toString().slice(-6)}`,
+          submitted_at: new Date().toISOString(),
+          approved_at: new Date().toISOString(),
+          notes: `Admin granted premium for ${numDays} days`,
         });
+        localStorage.setItem('sellsense_payment_submissions', JSON.stringify(stored));
       } catch {}
-      alert(`✅ Premium permission granted to ${u.full_name} for ${numDays} days!`);
-      // Do NOT call loadTabData — it resets state from fallback
+      // Optimistic UI — update the users list instantly
+      setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, active_subscriptions: 1, is_premium: 1 } : usr));
+      setQuickGrantUser(null);
+      // Best-effort backend call (silent fail)
+      backendApi.adminAction(`users/${u.id}/grant-premium`, {
+        durationDays: numDays,
+        adminNote: `Manual permission granted by admin for ${numDays} days`,
+      }).catch(() => null);
     };
 
     const handleRevokeUserPremiumDirect = async (u: any) => {
@@ -3470,8 +3493,105 @@ export const AdminPage: React.FC = () => {
             onSave={() => loadTabData('features')}
           />
         )}
+
+        {/* Quick Grant Premium Modal — no browser prompt() */}
+        {quickGrantUser && (
+          <QuickGrantModal
+            user={quickGrantUser}
+            onClose={() => setQuickGrantUser(null)}
+            onConfirm={(numDays) => handleConfirmGrantPremium(quickGrantUser, numDays)}
+          />
+        )}
       </div>
     );
   };
+
+// ─── Quick Grant Premium Modal ────────────────────────────────────────────────
+// Replaces browser prompt() which is blocked in production/Vercel environments
+const QuickGrantModal: React.FC<{
+  user: any;
+  onClose: () => void;
+  onConfirm: (days: number) => void;
+}> = ({ user, onClose, onConfirm }) => {
+  const [days, setDays] = React.useState(30);
+  const presets = [7, 30, 60, 90, 180, 365];
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full border border-slate-200 overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 bg-gradient-to-r from-lime-400 to-emerald-500 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="font-black text-slate-950 text-sm leading-tight">Grant Premium Access</p>
+              <p className="text-xs text-slate-800 font-medium">{user.full_name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-700 hover:text-slate-900 transition">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          <div>
+            <p className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Select Duration</p>
+            <div className="grid grid-cols-3 gap-2">
+              {presets.map(d => (
+                <button
+                  key={d}
+                  onClick={() => setDays(d)}
+                  className={`py-2 rounded-xl text-xs font-black transition-all border ${
+                    days === d
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-lime-50 hover:border-lime-400 hover:text-lime-800'
+                  }`}
+                >
+                  {d === 365 ? '1 Year' : `${d} Days`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Or Enter Custom Days</p>
+            <input
+              type="number"
+              min={1}
+              max={3650}
+              value={days}
+              onChange={e => setDays(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent"
+            />
+          </div>
+
+          <div className="p-3 bg-lime-50 rounded-xl border border-lime-200 text-xs text-lime-900 font-medium">
+            🔓 Premium features will be unlocked immediately for <strong>{user.full_name}</strong> for <strong>{days} day{days !== 1 ? 's' : ''}</strong>.
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 pb-6 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(days)}
+            className="flex-1 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-md shadow-lime-200 transition"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            Grant Now
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default AdminPage;
