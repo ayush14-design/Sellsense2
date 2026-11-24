@@ -4,7 +4,7 @@ import { ProductCard } from '../components/ProductCard';
 import { authStorage } from '../utils/auth';
 import {
   Search, Grid3x3, List, Sparkles, CreditCard, Lock, CheckCircle,
-  ArrowRight, MapPin, FileSpreadsheet, Upload, Settings, RefreshCw, Download,
+  ArrowRight, MapPin, FileSpreadsheet, Upload, Settings, RefreshCw,
   PlusCircle, UtensilsCrossed, ExternalLink
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -13,6 +13,7 @@ import { Button } from '../components/Button';
 import { backendApi } from '../services/backendApi';
 import { UploadReviewsModal } from '../components/UploadReviewsModal';
 import { ManualReviewAnalysisModal } from '../components/ManualReviewAnalysisModal';
+import { AddSingleReviewModal } from '../components/AddSingleReviewModal';
 import type { Product, Platform } from '../types';
 
 export const ProductsPage: React.FC = () => {
@@ -30,6 +31,7 @@ export const ProductsPage: React.FC = () => {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [uploadedProducts, setUploadedProducts] = useState<Product[]>([]);
   const [selectedProductForAnalysis, setSelectedProductForAnalysis] = useState<string | null>(null);
+  const [addSingleReviewModalOpen, setAddSingleReviewModalOpen] = useState(false);
 
   const [manualStats, setManualStats] = useState<{
     totalImportedReviews: number;
@@ -172,24 +174,6 @@ export const ProductsPage: React.FC = () => {
     });
   }, [allProducts, searchQuery, selectedCategory]);
 
-  const downloadSampleTemplate = () => {
-    const csvContent =
-      'Dish Name,Customer Review,Rating,Review Date,Platform\n' +
-      'Butter Chicken,"Rich and creamy gravy, absolutely delicious but slightly salty.",4,2026-10-18,Zomato\n' +
-      'Butter Chicken,"Tender chicken and piping hot delivery. Loved it!",5,2026-10-17,Swiggy\n' +
-      'Paneer Tikka,"Crispy on outside and soft inside. Packaging was intact.",5,2026-10-18,Zomato\n' +
-      'Garlic Naan,"Arrived lukewarm and a bit rubbery, delivery was late.",2,2026-10-16,Zomato\n' +
-      'Veg Biryani,"Aromatic spices and generous portion size. Great value for money.",5,2026-10-19,Swiggy\n';
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'SellSense_Sample_Reviews_Template.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   const container = {
     hidden: { opacity: 0 },
@@ -241,6 +225,15 @@ export const ProductsPage: React.FC = () => {
                 >
                   <Upload size={18} />
                   <span>Upload Spreadsheet</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => setAddSingleReviewModalOpen(true)}
+                  className="bg-white text-slate-800 border border-slate-200 font-bold py-2.5 px-4 rounded-xl shadow-xs flex items-center gap-2 hover:bg-lime-50 hover:border-lime-300"
+                >
+                  <PlusCircle size={18} className="text-lime-600" />
+                  <span>Add Review</span>
                 </Button>
 
                 <Button
@@ -347,11 +340,11 @@ export const ProductsPage: React.FC = () => {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={downloadSampleTemplate}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-1.5 transition-colors"
+                  onClick={() => setAddSingleReviewModalOpen(true)}
+                  className="px-3 py-1.5 text-xs font-bold text-lime-900 bg-lime-100 hover:bg-lime-200 rounded-lg flex items-center gap-1.5 transition-colors"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Sample Template</span>
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Add Single Review</span>
                 </button>
                 <button
                   onClick={() => setUploadModalOpen(true)}
@@ -463,11 +456,11 @@ export const ProductsPage: React.FC = () => {
 
                 <Button
                   variant="outline"
-                  onClick={downloadSampleTemplate}
-                  className="w-full sm:w-auto font-bold border-slate-300 hover:bg-slate-50 text-slate-700 px-5 py-3 rounded-2xl flex items-center justify-center gap-2"
+                  onClick={() => setAddSingleReviewModalOpen(true)}
+                  className="w-full sm:w-auto font-bold border-lime-300 hover:bg-lime-50 text-lime-700 px-5 py-3 rounded-2xl flex items-center justify-center gap-2"
                 >
-                  <Download size={18} />
-                  <span>Download Sample Template</span>
+                  <PlusCircle size={18} />
+                  <span>Add a Single Review</span>
                 </Button>
               </div>
 
@@ -674,6 +667,20 @@ export const ProductsPage: React.FC = () => {
           onClose={() => setSelectedProductForAnalysis(null)}
           productName={selectedProductForAnalysis}
           restaurantId={activeRestaurant.id}
+        />
+      )}
+
+      {/* Add Single Review Modal */}
+      {addSingleReviewModalOpen && (
+        <AddSingleReviewModal
+          isOpen={addSingleReviewModalOpen}
+          onClose={() => setAddSingleReviewModalOpen(false)}
+          restaurantId={activeRestaurant.id}
+          existingDishes={allProducts.map(p => p.name)}
+          onSuccess={() => {
+            setAddSingleReviewModalOpen(false);
+            fetchProductsAndStats();
+          }}
         />
       )}
     </div>
