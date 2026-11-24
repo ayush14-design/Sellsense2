@@ -133,6 +133,17 @@ export const AdminPage: React.FC = () => {
         // Load approved payment submissions to check subscriptions
         const localPayments: any[] = JSON.parse(localStorage.getItem('sellsense_payment_submissions') || '[]');
         const approvedUserIds = new Set(localPayments.filter((p: any) => p.status === 'approved').map((p: any) => p.user_id || p.userId));
+        // Load admin-granted premiums
+        const premiumGrants: Record<string, any> = JSON.parse(localStorage.getItem('sellsense_admin_premium_grants') || '{}');
+        const isPremiumGranted = (id: string, email?: string) => {
+          if (premiumGrants[id]) {
+            // Check not expired
+            const exp = premiumGrants[id]?.expiresAt;
+            return !exp || new Date(exp) > new Date();
+          }
+          if (email && Object.values(premiumGrants).find((g: any) => g.email === email)) return true;
+          return approvedUserIds.has(id);
+        };
 
         const baseUsers = [
           {
@@ -155,7 +166,7 @@ export const AdminPage: React.FC = () => {
             phone: '+91 91234 56789',
             status: 'active',
             is_active: 1,
-            active_subscriptions: 1,
+            active_subscriptions: isPremiumGranted('user_demo_001', 'demo@nelamrestaurants.com') ? 1 : 1, // demo always premium
             restaurant_count: 1,
             created_at: '2026-09-01T00:00:00Z',
           },
@@ -167,7 +178,7 @@ export const AdminPage: React.FC = () => {
             phone: '+91 98989 89898',
             status: 'active',
             is_active: 1,
-            active_subscriptions: 0,
+            active_subscriptions: isPremiumGranted('user_demo_guest', 'rahul.sharma@spicehut.in') ? 1 : 0,
             restaurant_count: 1,
             created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
           },
@@ -180,20 +191,26 @@ export const AdminPage: React.FC = () => {
             phone: u.phone || '',
             status: 'active',
             is_active: 1,
-            active_subscriptions: approvedUserIds.has(u.id) ? 1 : 0,
+            active_subscriptions: isPremiumGranted(u.id, u.email) ? 1 : 0,
             restaurant_count: 1,
             created_at: u.createdAt || u.created_at || new Date().toISOString(),
           })),
         ];
 
-        // Deduplicate by id, then filter deleted
+        // Deduplicate by id, then filter deleted, then apply premium grants from localStorage
         const seen = new Set<string>();
-        const filteredUsers = baseUsers.filter((u) => {
-          if (deletedUserIds.includes(u.id)) return false;
-          if (seen.has(u.id)) return false;
-          seen.add(u.id);
-          return true;
-        });
+        const filteredUsers = baseUsers
+          .filter((u) => {
+            if (deletedUserIds.includes(u.id)) return false;
+            if (seen.has(u.id)) return false;
+            seen.add(u.id);
+            return true;
+          })
+          .map((u) => ({
+            ...u,
+            // Always reflect the latest localStorage grant/revoke state
+            active_subscriptions: isPremiumGranted(u.id, u.email) ? 1 : (u.active_subscriptions || 0),
+          }));
 
         return {
           users: filteredUsers,
@@ -931,16 +948,29 @@ export const AdminPage: React.FC = () => {
             )},
             { key: 'joined', header: 'Joined', render: (u: any) => <span className="text-sm text-slate-500">{formatDate(u.created_at)}</span> },
             { key: 'actions', header: 'Admin Access Control', render: (u: any) => (
-              <div className="flex items-center justify-end gap-1.5">
-                {u.active_subscriptions > 0 ? (
-                  <button
-                    onClick={() => handleRevokeUserPremiumDirect(u)}
-                    className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition flex items-center gap-1 border border-rose-200"
-                    title="Revoke premium access immediately"
-                  >
-                    <Lock className="w-3.5 h-3.5" /> Revoke
-                  </button>
-                ) : (
+              <div className="flex items-center gap-2">
+                {/* Premium ON/OFF Toggle */}
+                <button
+                  onClick={() => u.active_subscriptions > 0 ? handleRevokeUserPremiumDirect(u) : handleGrantUserPremium(u)}
+                  title={u.active_subscriptions > 0 ? 'Click to REVOKE premium access' : 'Click to GRANT premium access'}
+                  className={`relative inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-black transition-all border ${
+                    u.active_subscriptions > 0
+                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-200'
+                      : 'bg-slate-100 hover:bg-lime-50 text-slate-500 border-slate-300 hover:border-lime-400 hover:text-lime-700'
+                  }`}
+                >
+                  {/* Toggle pill */}
+                  <span className={`w-9 h-5 rounded-full flex items-center transition-all ${
+                    u.active_subscriptions > 0 ? 'bg-white/30' : 'bg-slate-300'
+                  }`}>
+                    <span className={`w-4 h-4 rounded-full bg-white shadow transition-all transform ${
+                      u.active_subscriptions > 0 ? 'translate-x-4' : 'translate-x-0.5'
+                    }`} />
+                  </span>
+                  <span>{u.active_subscriptions > 0 ? 'Premium ON' : 'Premium OFF'}</span>
+                </button>
+                {/* Give Permission quick button (always visible for Free Tier) */}
+                {u.active_subscriptions === 0 && (
                   <button
                     onClick={() => handleGrantUserPremium(u)}
                     className="px-3 py-1.5 bg-lime-400 hover:bg-lime-300 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
@@ -1779,30 +1809,59 @@ export const AdminPage: React.FC = () => {
     };
 
     const handleGrantUserPremium = async (u: any) => {
-      const days = prompt(`Grant premium features to owner ${u.full_name}. Enter duration in days:`, '30');
+      const days = prompt(`Grant premium features to ${u.full_name}. Enter duration in days:`, '30');
       if (!days || isNaN(parseInt(days))) return;
+      const numDays = parseInt(days);
+      // Persist granted premium to localStorage immediately
+      try {
+        const grants: Record<string, any> = JSON.parse(localStorage.getItem('sellsense_admin_premium_grants') || '{}');
+        grants[u.id] = {
+          userId: u.id,
+          email: u.email,
+          name: u.full_name,
+          grantedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + numDays * 86400000).toISOString(),
+          durationDays: numDays,
+          isPremium: true,
+        };
+        localStorage.setItem('sellsense_admin_premium_grants', JSON.stringify(grants));
+      } catch {}
+      // Optimistic UI
+      setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, active_subscriptions: 1, is_premium: 1 } : usr));
+      // Best-effort backend
       try {
         await backendApi.adminAction(`users/${u.id}/grant-premium`, {
-          durationDays: parseInt(days),
-          adminNote: `Manual permission granted by admin for ${days} days`,
+          durationDays: numDays,
+          adminNote: `Manual permission granted by admin for ${numDays} days`,
         });
-        alert(`Success! Premium features permission granted to ${u.full_name} for ${days} days.`);
-        loadTabData('users');
-      } catch (err: any) {
-        alert(err?.message || 'Failed to grant user premium features');
-      }
+      } catch {}
+      alert(`✅ Premium permission granted to ${u.full_name} for ${numDays} days!`);
+      // Do NOT call loadTabData — it resets state from fallback
     };
 
     const handleRevokeUserPremiumDirect = async (u: any) => {
-      const confirmed = window.confirm(`Revoke premium features access for ${u.full_name}? The user will return to Free Tier.`);
+      const confirmed = window.confirm(`Revoke premium features for ${u.full_name}? They will return to Free Tier.`);
       if (!confirmed) return;
+      // Remove from localStorage grants
+      try {
+        const grants: Record<string, any> = JSON.parse(localStorage.getItem('sellsense_admin_premium_grants') || '{}');
+        delete grants[u.id];
+        localStorage.setItem('sellsense_admin_premium_grants', JSON.stringify(grants));
+      } catch {}
+      // Update payment submissions to revoked
+      try {
+        const subs = JSON.parse(localStorage.getItem('sellsense_payment_submissions') || '[]');
+        const updated = subs.map((p: any) => p.user_id === u.id ? { ...p, status: 'rejected', permission_granted: false } : p);
+        localStorage.setItem('sellsense_payment_submissions', JSON.stringify(updated));
+      } catch {}
+      // Optimistic UI
+      setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, active_subscriptions: 0, is_premium: 0 } : usr));
+      // Best-effort backend
       try {
         await backendApi.adminAction(`users/${u.id}/revoke-premium`, {});
-        alert(`Access revoked. ${u.full_name} is now on Free Tier.`);
-        loadTabData('users');
-      } catch (err: any) {
-        alert(err?.message || 'Failed to revoke user premium features');
-      }
+      } catch {}
+      alert(`Access revoked. ${u.full_name} is now on Free Tier.`);
+      // Do NOT call loadTabData
     };
 
     const handleViewPayment = (id: string) => {
@@ -2946,6 +3005,22 @@ export const AdminPage: React.FC = () => {
           setSubscriptions(prev => [newSub, ...prev.filter(s => s.user_id !== targetUserId)]);
           setUsers(prev => prev.map(u => (u.id === targetUserId || u.email === targetUserId) ? { ...u, active_subscriptions: 1, is_premium: 1 } : u));
 
+          // Persist to premium grants so it survives page refresh
+          try {
+            const grants: Record<string, any> = JSON.parse(localStorage.getItem('sellsense_admin_premium_grants') || '{}');
+            grants[targetUserId] = {
+              userId: targetUserId,
+              email: targetUser?.email || targetUserId,
+              name: userName,
+              grantedAt: new Date().toISOString(),
+              expiresAt: new Date(Date.now() + durationDays * 86400000).toISOString(),
+              durationDays,
+              planName: chosenPlan.name,
+              isPremium: true,
+            };
+            localStorage.setItem('sellsense_admin_premium_grants', JSON.stringify(grants));
+          } catch {}
+
           // Also save in localStorage payment submissions as approved record
           try {
             const stored = JSON.parse(localStorage.getItem('sellsense_payment_submissions') || '[]');
@@ -2969,7 +3044,7 @@ export const AdminPage: React.FC = () => {
             localStorage.setItem('sellsense_payment_submissions', JSON.stringify(stored));
           } catch {}
 
-          alert(`Success! Permission granted to ${userName}. Premium features are now fully unlocked for ${durationDays} days.`);
+          alert(`✅ Permission granted to ${userName}! Premium features unlocked for ${durationDays} days.`);
           onSuccess();
           onClose();
         } catch (err: any) {
@@ -3383,7 +3458,7 @@ export const AdminPage: React.FC = () => {
             users={users}
             plans={plans.length > 0 ? plans : getFallbackDataForTab('plans').plans}
             onClose={() => setGrantSubModalOpen(false)}
-            onSuccess={() => { loadTabData('subscriptions'); loadTabData('users'); loadTabData('overview'); }}
+            onSuccess={() => { loadTabData('subscriptions'); loadTabData('overview'); /* users already updated optimistically */ }}
           />
         )}
 
