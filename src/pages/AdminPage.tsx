@@ -126,6 +126,14 @@ export const AdminPage: React.FC = () => {
       }
       case 'users': {
         const current = authStorage.getUser();
+        // Load deleted user IDs from localStorage
+        const deletedUserIds: string[] = JSON.parse(localStorage.getItem('sellsense_admin_deleted_users') || '[]');
+        // Load any locally-registered users (e.g. from Google auth or sign-up)
+        const localRegistered: any[] = JSON.parse(localStorage.getItem('sellsense_registered_users') || '[]');
+        // Load approved payment submissions to check subscriptions
+        const localPayments: any[] = JSON.parse(localStorage.getItem('sellsense_payment_submissions') || '[]');
+        const approvedUserIds = new Set(localPayments.filter((p: any) => p.status === 'approved').map((p: any) => p.user_id || p.userId));
+
         const baseUsers = [
           {
             id: current?.id || 'user_g_ayush14',
@@ -162,11 +170,34 @@ export const AdminPage: React.FC = () => {
             active_subscriptions: 0,
             restaurant_count: 1,
             created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
-          }
+          },
+          // Merge locally registered users (deduplicate by id/email)
+          ...localRegistered.map((u: any) => ({
+            id: u.id,
+            full_name: u.fullName || u.full_name || u.name || u.email,
+            email: u.email,
+            role: u.role || 'restaurant_owner',
+            phone: u.phone || '',
+            status: 'active',
+            is_active: 1,
+            active_subscriptions: approvedUserIds.has(u.id) ? 1 : 0,
+            restaurant_count: 1,
+            created_at: u.createdAt || u.created_at || new Date().toISOString(),
+          })),
         ];
+
+        // Deduplicate by id, then filter deleted
+        const seen = new Set<string>();
+        const filteredUsers = baseUsers.filter((u) => {
+          if (deletedUserIds.includes(u.id)) return false;
+          if (seen.has(u.id)) return false;
+          seen.add(u.id);
+          return true;
+        });
+
         return {
-          users: baseUsers,
-          total: baseUsers.length
+          users: filteredUsers,
+          total: filteredUsers.length
         };
       }
       case 'payments': {
@@ -228,41 +259,42 @@ export const AdminPage: React.FC = () => {
           total: activeSubs.length
         };
       }
-      case 'plans':
-        return {
-          plans: [
-            {
-              id: 'plan_basic',
-              name: 'Basic',
-              description: 'Perfect for single restaurant review analytics and AI sentiment',
-              priceInr: 531,
-              durationDays: 30,
-              status: 'active',
-              displayOrder: 1,
-              features: ['review_monitoring', 'sentiment_analysis', 'basic_insights', 'email_alerts', 'up_to_5_products', 'repetitive_review_types', 'review_quality_analysis', 'google_review_analysis'],
-            },
-            {
-              id: 'plan_professional',
-              name: 'Professional',
-              description: 'For multi-outlet restaurants with advanced AI intelligence',
-              priceInr: 2499,
-              durationDays: 30,
-              status: 'active',
-              displayOrder: 2,
-              features: ['review_monitoring', 'sentiment_analysis', 'advanced_insights', 'competitor_analysis', 'fake_review_detection', 'up_to_20_products', 'priority_support', 'google_review_analysis'],
-            },
-            {
-              id: 'plan_enterprise',
-              name: 'Enterprise',
-              description: 'Custom white-label review platform for restaurant chains and franchises',
-              priceInr: 9999,
-              durationDays: 365,
-              status: 'active',
-              displayOrder: 3,
-              features: ['all_features', 'white_label_reports', 'dedicated_manager', 'api_access', 'custom_integration', 'unlimited_products'],
-            }
-          ]
-        };
+      case 'plans': {
+        const deletedPlanIds: string[] = JSON.parse(localStorage.getItem('sellsense_admin_deleted_plans') || '[]');
+        const allPlans = [
+          {
+            id: 'plan_basic',
+            name: 'Basic',
+            description: 'Perfect for single restaurant review analytics and AI sentiment',
+            priceInr: 531,
+            durationDays: 30,
+            status: 'active',
+            displayOrder: 1,
+            features: ['review_monitoring', 'sentiment_analysis', 'basic_insights', 'email_alerts', 'up_to_5_products', 'repetitive_review_types', 'review_quality_analysis', 'google_review_analysis'],
+          },
+          {
+            id: 'plan_professional',
+            name: 'Professional',
+            description: 'For multi-outlet restaurants with advanced AI intelligence',
+            priceInr: 2499,
+            durationDays: 30,
+            status: 'active',
+            displayOrder: 2,
+            features: ['review_monitoring', 'sentiment_analysis', 'advanced_insights', 'competitor_analysis', 'fake_review_detection', 'up_to_20_products', 'priority_support', 'google_review_analysis'],
+          },
+          {
+            id: 'plan_enterprise',
+            name: 'Enterprise',
+            description: 'Custom white-label review platform for restaurant chains and franchises',
+            priceInr: 9999,
+            durationDays: 365,
+            status: 'active',
+            displayOrder: 3,
+            features: ['all_features', 'white_label_reports', 'dedicated_manager', 'api_access', 'custom_integration', 'unlimited_products'],
+          }
+        ];
+        return { plans: allPlans.filter(p => !deletedPlanIds.includes(p.id)) };
+      }
       case 'addons':
         return {
           addons: [
@@ -1835,15 +1867,30 @@ export const AdminPage: React.FC = () => {
 
     const handleDeleteUser = async (id: string) => {
       if (!confirm('Are you sure you want to deactivate or remove this user?')) return;
+      // Persist deletion to localStorage so fallback doesn't re-seed them
+      try {
+        const deleted: string[] = JSON.parse(localStorage.getItem('sellsense_admin_deleted_users') || '[]');
+        if (!deleted.includes(id)) {
+          deleted.push(id);
+          localStorage.setItem('sellsense_admin_deleted_users', JSON.stringify(deleted));
+        }
+      } catch {}
+      // Also remove from registered users cache if present
+      try {
+        const reg: any[] = JSON.parse(localStorage.getItem('sellsense_registered_users') || '[]');
+        const filtered = reg.filter((u: any) => u.id !== id);
+        localStorage.setItem('sellsense_registered_users', JSON.stringify(filtered));
+      } catch {}
+      // Optimistic UI removal first
+      setUsers(prev => prev.filter(u => u.id !== id));
+      // Try backend delete (best-effort)
       try {
         await backendApi.adminDelete(`users/${id}`);
-        setUsers(prev => prev.filter(u => u.id !== id));
         alert('User successfully deactivated / removed.');
-        loadTabData('users');
       } catch (err) {
-        setUsers(prev => prev.filter(u => u.id !== id));
         alert('User removed from active view.');
       }
+      // Do NOT call loadTabData('users') here — it would re-seed the deleted user from fallback
     };
     const handleToggleRestaurant = async (id: string, isActive: boolean) => {
       try {
@@ -1903,10 +1950,20 @@ export const AdminPage: React.FC = () => {
 
     const handleDeletePlan = async (id: string) => {
       if (!confirm('Archive this plan? Active subscriptions will prevent deletion.')) return;
+      // Persist deleted plan ID to localStorage
+      try {
+        const deleted: string[] = JSON.parse(localStorage.getItem('sellsense_admin_deleted_plans') || '[]');
+        if (!deleted.includes(id)) { deleted.push(id); localStorage.setItem('sellsense_admin_deleted_plans', JSON.stringify(deleted)); }
+      } catch {}
+      // Optimistic UI
+      setPlans(prev => prev.filter(p => p.id !== id));
       try {
         await backendApi.adminDelete(`plans/${id}`);
-        loadTabData('plans');
-      } catch (err) { alert('Failed to archive plan'); }
+        alert('Plan deleted/archived.');
+      } catch (err) {
+        alert('Plan removed from view (archived locally).');
+      }
+      // Do NOT reload – fallback re-seeds default plans
     };
 
     const handleArchivePlan = async (id: string) => {
